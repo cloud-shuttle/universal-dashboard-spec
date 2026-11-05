@@ -24,6 +24,8 @@ Widgets can declare an optional `intent` (analytical message) drawn from a small
 
 See [docs/taxonomy.md](docs/taxonomy.md) for the full list, preferred encodings, and rationale (based on Stephen Few’s quantitative messages and common BI practice).
 
+**LLMs:** read [AGENTS.md](AGENTS.md) for the short authoring checklist.
+
 ## High-level structure
 
 ```yaml
