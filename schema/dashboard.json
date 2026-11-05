@@ -73,6 +73,15 @@
         "type": {
           "enum": ["string", "number", "date", "boolean", "date_range"]
         },
+        "values": {
+          "description": "Allowed values (for radio / dropdown parameters)",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "affects": {
+          "description": "What this parameter changes",
+          "enum": ["measure", "dimension", "title", "filter", "option"]
+        },
         "default": {},
         "required": { "type": "boolean" },
         "description": { "type": "string" }
@@ -85,7 +94,7 @@
         "name": { "type": "string" },
         "title": { "type": "string" },
         "aggregation": {
-          "enum": ["sum", "count", "count_distinct", "avg", "min", "max"]
+          "enum": ["sum", "count", "count_distinct", "avg", "min", "max", "ltm"]
         },
         "field": { "type": "string" },
         "format": { "type": "string" },
@@ -114,7 +123,7 @@
         "dimension": { "type": "string" },
         "control": {
           "description": "UI control to render for this filter",
-          "enum": ["dropdown", "multi_select", "date_picker", "date_range", "slider", "search"]
+          "enum": ["dropdown", "multi_select", "radio", "date_picker", "date_range", "slider", "search"]
         },
         "multi": { "type": "boolean" },
         "cascadeFrom": {
@@ -149,7 +158,9 @@
             "number",
             "scatter",
             "heatmap",
-            "pivot"
+            "pivot",
+            "combo",
+            "diverging"
           ]
         },
         "intent": {
@@ -166,6 +177,10 @@
           ]
         },
         "title": { "type": "string" },
+        "titleTemplate": {
+          "description": "Dynamic title, e.g. '{{period}} ARR'",
+          "type": "string"
+        },
         "tab": { "type": "string" },
         "measures": { "type": "array", "items": { "type": "string" } },
         "dimensions": { "type": "array", "items": { "type": "string" } },
@@ -180,6 +195,11 @@
           "type": "array",
           "items": { "$ref": "#/$defs/action" }
         },
+        "series": {
+          "description": "Per-series styling and tooltips",
+          "type": "array",
+          "items": { "$ref": "#/$defs/series" }
+        },
         "layout": {
           "type": "object",
           "required": ["x", "y", "w", "h"],
@@ -191,6 +211,18 @@
           }
         },
         "options": { "type": "object" }
+      }
+    },
+    "series": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "tooltipFields": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
       }
     },
     "action": {
