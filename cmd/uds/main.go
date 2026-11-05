@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cloud-shuttle/universal-dashboard-spec/internal/echarts"
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/excalidraw"
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/metabase"
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/parser"
@@ -17,7 +18,7 @@ func main() {
 	var (
 		input    = flag.String("in", "", "Path to UDS Dashboard YAML file")
 		models   = flag.String("models", "", "Comma-separated paths to SemanticModel YAML files")
-		target   = flag.String("target", "excalidraw", "Target: excalidraw | metabase")
+		target   = flag.String("target", "excalidraw", "Target: excalidraw | metabase | echarts")
 		out      = flag.String("out", "", "Output path (directory or file)")
 		strict   = flag.Bool("strict", false, "Treat intent/type mismatches as errors")
 		database = flag.String("database", "", "Override source database (Metabase)")
@@ -101,6 +102,26 @@ func main() {
 			if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
 				log.Fatal(err)
 			}
+			if err := os.WriteFile(p, content, 0644); err != nil {
+				log.Fatal(err)
+			}
+			fmt.Println("wrote", p)
+		}
+
+	case "echarts":
+		dir := *out
+		if dir == "" {
+			dir = "echarts-out"
+		}
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			log.Fatal(err)
+		}
+		files, err := echarts.Emit(dash)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for name, content := range files {
+			p := filepath.Join(dir, name)
 			if err := os.WriteFile(p, content, 0644); err != nil {
 				log.Fatal(err)
 			}
