@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cloud-shuttle/universal-dashboard-spec/schema/dashboard.json",
+  "title": "Universal Dashboard Specification",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "const": "uds/v1" },
+    "kind": { "const": "Dashboard" },
+    "metadata": {
+      "type": "object",
+      "required": ["name", "title"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "title": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["measures", "dimensions", "widgets"],
+      "properties": {
+        "measures": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/measure" }
+        },
+        "dimensions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dimension" }
+        },
+        "filters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/filter" }
+        },
+        "tabs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tab" }
+        },
+        "widgets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/widget" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "measure": {
+      "type": "object",
+      "required": ["name", "aggregation"],
+      "properties": {
+        "name": { "type": "string" },
+        "title": { "type": "string" },
+        "aggregation": {
+          "enum": ["sum", "count", "count_distinct", "avg", "min", "max"]
+        },
+        "field": { "type": "string" },
+        "format": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "dimension": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "title": { "type": "string" },
+        "field": { "type": "string" },
+        "type": { "enum": ["string", "number", "date", "boolean"] },
+        "temporalGrain": {
+          "enum": ["day", "week", "month", "quarter", "year"]
+        }
+      }
+    },
+    "filter": {
+      "type": "object",
+      "required": ["name", "dimension"],
+      "properties": {
+        "name": { "type": "string" },
+        "title": { "type": "string" },
+        "dimension": { "type": "string" },
+        "default": {},
+        "required": { "type": "boolean" }
+      }
+    },
+    "tab": {
+      "type": "object",
+      "required": ["name", "title"],
+      "properties": {
+        "name": { "type": "string" },
+        "title": { "type": "string" }
+      }
+    },
+    "widget": {
+      "type": "object",
+      "required": ["id", "type", "title", "layout"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": {
+          "enum": [
+            "line",
+            "bar",
+            "stacked_bar",
+            "area",
+            "pie",
+            "table",
+            "number",
+            "scatter",
+            "heatmap"
+          ]
+        },
+        "title": { "type": "string" },
+        "tab": { "type": "string" },
+        "measures": { "type": "array", "items": { "type": "string" } },
+        "dimensions": { "type": "array", "items": { "type": "string" } },
+        "filters": { "type": "array", "items": { "type": "string" } },
+        "layout": {
+          "type": "object",
+          "required": ["x", "y", "w", "h"],
+          "properties": {
+            "x": { "type": "integer", "minimum": 0, "maximum": 23 },
+            "y": { "type": "integer", "minimum": 0 },
+            "w": { "type": "integer", "minimum": 1, "maximum": 24 },
+            "h": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "options": { "type": "object" }
+      }
+    }
+  }
+}
