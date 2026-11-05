@@ -1,0 +1,25 @@
+{
+  "skill": "universal-dashboard-spec",
+  "test_cases": [
+    {
+      "input": "write a UDS dashboard for sales",
+      "should_trigger": true
+    },
+    {
+      "input": "add intent to this widget",
+      "should_trigger": true
+    },
+    {
+      "input": "compile this dashboard to Metabase",
+      "should_trigger": true
+    },
+    {
+      "input": "what is the weather today",
+      "should_trigger": false
+    },
+    {
+      "input": "explain Stephen Few taxonomy in general",
+      "should_trigger": false
+    }
+  ]
+}
