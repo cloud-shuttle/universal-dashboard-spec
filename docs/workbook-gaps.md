@@ -84,14 +84,14 @@ options:
 
 ## Status
 
-| Feature                  | Schema | Parser | Emitters |
-|--------------------------|--------|--------|----------|
-| Parameters + values + affects | yes | pending | pending |
-| Radio control            | yes    | pending | pending  |
-| Dynamic titles           | yes    | pending | pending  |
-| Combo / diverging        | yes    | pending | pending  |
-| Series colours + tooltips| yes    | pending | pending  |
-| Pivot formatting         | yes    | pending | pending  |
-| LTM aggregation          | yes    | pending | pending  |
+| Feature                       | Schema | Parser | Emitters |
+|-------------------------------|--------|--------|----------|
+| Parameters + values + affects | yes    | yes    | pending  |
+| Radio control                 | yes    | yes    | pending  |
+| Dynamic titles                | yes    | yes    | pending  |
+| Combo / diverging             | yes    | yes    | pending  |
+| Series colours + tooltips     | yes    | yes    | pending  |
+| Pivot formatting              | yes    | yes    | pending  |
+| LTM aggregation               | yes    | yes    | pending  |
 
-These are additive. Existing specs remain valid.
+These are additive. Existing specs remain valid. Parser structs now load all of the above; emitters still need to consume them.
