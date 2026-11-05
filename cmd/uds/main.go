@@ -14,10 +14,13 @@ import (
 
 func main() {
 	var (
-		input  = flag.String("in", "", "Path to UDS YAML file")
-		target = flag.String("target", "excalidraw", "Target: excalidraw | metabase")
-		out    = flag.String("out", "", "Output path (directory or file)")
-		strict = flag.Bool("strict", false, "Treat intent/type mismatches as errors")
+		input    = flag.String("in", "", "Path to UDS YAML file")
+		target   = flag.String("target", "excalidraw", "Target: excalidraw | metabase")
+		out      = flag.String("out", "", "Output path (directory or file)")
+		strict   = flag.Bool("strict", false, "Treat intent/type mismatches as errors")
+		database = flag.String("database", "", "Override source database (Metabase)")
+		schema   = flag.String("schema", "", "Override source schema (Metabase)")
+		table    = flag.String("table", "", "Override source table (Metabase)")
 	)
 	flag.Parse()
 
@@ -67,12 +70,19 @@ func main() {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			log.Fatal(err)
 		}
-		files, err := metabase.Emit(dash)
+		files, err := metabase.Emit(dash, metabase.EmitOptions{
+			Database: *database,
+			Schema:   *schema,
+			Table:    *table,
+		})
 		if err != nil {
 			log.Fatal(err)
 		}
 		for name, content := range files {
 			p := filepath.Join(dir, name)
+			if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+				log.Fatal(err)
+			}
 			if err := os.WriteFile(p, content, 0644); err != nil {
 				log.Fatal(err)
 			}
