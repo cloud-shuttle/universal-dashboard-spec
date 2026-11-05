@@ -6,30 +6,43 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/santhosh-tekuri/jsonschema/v5"
 	"gopkg.in/yaml.v3"
 )
 
 //go:embed schema.json
+//go:embed semantic-model.json
 var schemaFS embed.FS
 
-var compiledSchema *jsonschema.Schema
+var dashboardSchema *jsonschema.Schema
+var semanticSchema *jsonschema.Schema
 
 func init() {
-	b, err := schemaFS.ReadFile("schema.json")
+	db, err := schemaFS.ReadFile("schema.json")
+	if err != nil {
+		panic(err)
+	}
+	sb, err := schemaFS.ReadFile("semantic-model.json")
 	if err != nil {
 		panic(err)
 	}
 	c := jsonschema.NewCompiler()
-	if err := c.AddResource("dashboard.json", bytes.NewReader(b)); err != nil {
+	if err := c.AddResource("dashboard.json", bytes.NewReader(db)); err != nil {
 		panic(err)
 	}
-	s, err := c.Compile("dashboard.json")
+	if err := c.AddResource("semantic-model.json", bytes.NewReader(sb)); err != nil {
+		panic(err)
+	}
+	dashboardSchema, err = c.Compile("dashboard.json")
 	if err != nil {
 		panic(err)
 	}
-	compiledSchema = s
+	semanticSchema, err = c.Compile("semantic-model.json")
+	if err != nil {
+		panic(err)
+	}
 }
 
 type Dashboard struct {
@@ -47,6 +60,7 @@ type Metadata struct {
 
 type Spec struct {
 	Source     *Source     `yaml:"source,omitempty"`
+	Models     []string    `yaml:"models,omitempty"`
 	Measures   []Measure   `yaml:"measures"`
 	Dimensions []Dimension `yaml:"dimensions"`
 	Filters    []Filter    `yaml:"filters,omitempty"`
@@ -109,6 +123,42 @@ type Layout struct {
 	H int `yaml:"h"`
 }
 
+// SemanticModel is a reusable metrics / semantic layer definition.
+type SemanticModel struct {
+	APIVersion string            `yaml:"apiVersion"`
+	Kind       string            `yaml:"kind"`
+	Metadata   Metadata          `yaml:"metadata"`
+	Spec       SemanticModelSpec `yaml:"spec"`
+}
+
+type SemanticModelSpec struct {
+	Source     *Source    `yaml:"source,omitempty"`
+	Entities   []Entity   `yaml:"entities,omitempty"`
+	Dimensions []Dimension `yaml:"dimensions"`
+	Measures   []Measure  `yaml:"measures"`
+	Metrics    []Metric   `yaml:"metrics,omitempty"`
+}
+
+type Entity struct {
+	Name        string `yaml:"name"`
+	Type        string `yaml:"type"` // primary | foreign
+	Field       string `yaml:"field"`
+	Description string `yaml:"description,omitempty"`
+}
+
+type Metric struct {
+	Name        string `yaml:"name"`
+	Title       string `yaml:"title,omitempty"`
+	Type        string `yaml:"type"` // simple | ratio | cumulative | derived
+	Description string `yaml:"description,omitempty"`
+	Measure     string `yaml:"measure,omitempty"`
+	Numerator   string `yaml:"numerator,omitempty"`
+	Denominator string `yaml:"denominator,omitempty"`
+	InputMetric string `yaml:"input_metric,omitempty"`
+	GrainToDate string `yaml:"grain_to_date,omitempty"`
+	Expression  string `yaml:"expression,omitempty"`
+}
+
 // knownIntents is the canonical set from docs/taxonomy.md
 var knownIntents = map[string]bool{
 	"nominal_comparison": true,
@@ -157,7 +207,7 @@ func Load(path string) (*Dashboard, error) {
 	if err := json.Unmarshal(jb, &doc); err != nil {
 		return nil, err
 	}
-	if err := compiledSchema.Validate(doc); err != nil {
+	if err := dashboardSchema.Validate(doc); err != nil {
 		return nil, fmt.Errorf("schema: %w", err)
 	}
 
@@ -166,6 +216,88 @@ func Load(path string) (*Dashboard, error) {
 		return nil, err
 	}
 	return &d, nil
+}
+
+// LoadSemanticModel loads and validates a SemanticModel YAML file.
+func LoadSemanticModel(path string) (*SemanticModel, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var raw any
+	if err := yaml.Unmarshal(b, &raw); err != nil {
+		return nil, fmt.Errorf("yaml: %w", err)
+	}
+	normalized, err := normalize(raw)
+	if err != nil {
+		return nil, err
+	}
+	jb, err := json.Marshal(normalized)
+	if err != nil {
+		return nil, err
+	}
+	var doc any
+	if err := json.Unmarshal(jb, &doc); err != nil {
+		return nil, err
+	}
+	if err := semanticSchema.Validate(doc); err != nil {
+		return nil, fmt.Errorf("schema: %w", err)
+	}
+
+	var m SemanticModel
+	if err := yaml.Unmarshal(b, &m); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// Registry holds loaded SemanticModels for name resolution.
+type Registry struct {
+	models map[string]*SemanticModel
+}
+
+func NewRegistry() *Registry {
+	return &Registry{models: make(map[string]*SemanticModel)}
+}
+
+func (r *Registry) Add(m *SemanticModel) {
+	r.models[m.Metadata.Name] = m
+}
+
+func (r *Registry) Get(name string) (*SemanticModel, bool) {
+	m, ok := r.models[name]
+	return m, ok
+}
+
+// ResolveMeasure looks up a measure or metric by qualified or unqualified name.
+// Returns the model name (if qualified), the measure/metric name, and whether it was found.
+func (r *Registry) ResolveMeasure(ref string, dash *Dashboard) (modelName, name string, found bool) {
+	parts := strings.SplitN(ref, ".", 2)
+	if len(parts) == 2 {
+		modelName, name = parts[0], parts[1]
+		if m, ok := r.models[modelName]; ok {
+			for _, meas := range m.Spec.Measures {
+				if meas.Name == name {
+					return modelName, name, true
+				}
+			}
+			for _, met := range m.Spec.Metrics {
+				if met.Name == name {
+					return modelName, name, true
+				}
+			}
+		}
+		return modelName, name, false
+	}
+	// unqualified — look in dashboard first
+	name = ref
+	for _, meas := range dash.Spec.Measures {
+		if meas.Name == name {
+			return "", name, true
+		}
+	}
+	return "", name, false
 }
 
 // normalize converts map[any]any (from yaml) into map[string]any for json.

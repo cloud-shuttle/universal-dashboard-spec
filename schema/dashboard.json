@@ -21,6 +21,11 @@
       "required": ["measures", "dimensions", "widgets"],
       "properties": {
         "source": { "$ref": "#/$defs/source" },
+        "models": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Names of SemanticModels this dashboard references"
+        },
         "measures": {
           "type": "array",
           "items": { "$ref": "#/$defs/measure" }

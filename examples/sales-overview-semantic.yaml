@@ -1,0 +1,34 @@
+apiVersion: uds/v1
+kind: Dashboard
+metadata:
+  name: sales-overview-semantic
+  title: Sales Overview (Semantic)
+  description: Revenue by region using the orders SemanticModel
+
+spec:
+  models: [orders]
+
+  filters:
+    - name: date_range
+      title: Date Range
+      dimension: ordered_at
+      required: true
+
+  widgets:
+    - id: revenue_over_time
+      type: line
+      intent: time_series
+      title: Revenue over Time
+      measures: [orders.revenue]
+      dimensions: [orders.ordered_at]
+      filters: [date_range]
+      layout: { x: 0, y: 0, w: 16, h: 8 }
+
+    - id: revenue_by_region
+      type: bar
+      intent: ranking
+      title: Revenue by Region
+      measures: [orders.revenue]
+      dimensions: [orders.region]
+      filters: [date_range]
+      layout: { x: 16, y: 0, w: 8, h: 8 }

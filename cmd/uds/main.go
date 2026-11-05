@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/excalidraw"
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/metabase"
@@ -14,7 +15,8 @@ import (
 
 func main() {
 	var (
-		input    = flag.String("in", "", "Path to UDS YAML file")
+		input    = flag.String("in", "", "Path to UDS Dashboard YAML file")
+		models   = flag.String("models", "", "Comma-separated paths to SemanticModel YAML files")
 		target   = flag.String("target", "excalidraw", "Target: excalidraw | metabase")
 		out      = flag.String("out", "", "Output path (directory or file)")
 		strict   = flag.Bool("strict", false, "Treat intent/type mismatches as errors")
@@ -31,6 +33,22 @@ func main() {
 	dash, err := parser.Load(*input)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	reg := parser.NewRegistry()
+	if *models != "" {
+		for _, p := range strings.Split(*models, ",") {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			m, err := parser.LoadSemanticModel(p)
+			if err != nil {
+				log.Fatalf("load model %s: %v", p, err)
+			}
+			reg.Add(m)
+			fmt.Fprintf(os.Stderr, "loaded model %s\n", m.Metadata.Name)
+		}
 	}
 
 	warnings, err := dash.Validate()
