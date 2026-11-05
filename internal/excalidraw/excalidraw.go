@@ -35,7 +35,7 @@ type Label struct {
 	Text string `json:"text"`
 }
 
-func Emit(d *parser.Dashboard) ([]byte, error) {
+func Emit(d *parser.Dashboard, reg *parser.Registry) ([]byte, error) {
 	f := File{
 		Type:    "excalidraw",
 		Version: 2,
@@ -90,6 +90,9 @@ func Emit(d *parser.Dashboard) ([]byte, error) {
 			label = w.Type + "\n" + w.Intent
 		}
 		label = label + "\n" + w.Title
+		if titles := resolveMeasureTitles(w.Measures, d, reg); titles != "" {
+			label = label + "\n" + titles
+		}
 		f.Elements = append(f.Elements, Element{
 			ID:              "widget-" + w.ID,
 			Type:            "rectangle",
@@ -105,6 +108,54 @@ func Emit(d *parser.Dashboard) ([]byte, error) {
 	}
 
 	return json.MarshalIndent(f, "", "  ")
+}
+
+// resolveMeasureTitles returns a short comma-separated list of measure titles
+// for the widget, preferring SemanticModel titles when a registry is present.
+func resolveMeasureTitles(names []string, d *parser.Dashboard, reg *parser.Registry) string {
+	if len(names) == 0 {
+		return ""
+	}
+	var titles []string
+	for _, n := range names {
+		title := n
+		if reg != nil {
+			parts := strings.SplitN(n, ".", 2)
+			if len(parts) == 2 {
+				if m, ok := reg.Get(parts[0]); ok {
+					for _, meas := range m.Spec.Measures {
+						if meas.Name == parts[1] {
+							if meas.Title != "" {
+								title = meas.Title
+							} else {
+								title = meas.Name
+							}
+							break
+						}
+					}
+					for _, met := range m.Spec.Metrics {
+						if met.Name == parts[1] {
+							if met.Title != "" {
+								title = met.Title
+							} else {
+								title = met.Name
+							}
+							break
+						}
+					}
+				}
+			}
+		} else {
+			for _, meas := range d.Spec.Measures {
+				if meas.Name == n && meas.Title != "" {
+					title = meas.Title
+					break
+				}
+			}
+		}
+		titles = append(titles, title)
+	}
+	return strings.Join(titles, ", ")
 }
 
 func chartColor(t string) string {

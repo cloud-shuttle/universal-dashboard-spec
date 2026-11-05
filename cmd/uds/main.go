@@ -69,7 +69,7 @@ func main() {
 
 	switch *target {
 	case "excalidraw":
-		data, err := excalidraw.Emit(dash)
+		data, err := excalidraw.Emit(dash, reg)
 		if err != nil {
 			log.Fatal(err)
 		}
