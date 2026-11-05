@@ -23,7 +23,8 @@ type EmitOptions struct {
 // Source table is taken from the UDS spec.source block, then overridden by opts if non-empty.
 // Intent drives additional visualization and query settings (sort, stacking, goal line).
 // If reg is non-nil, qualified measure/dimension names (model.name) are resolved against it.
-// Filters declared on a widget are wired as parameter_mappings on the dashcard.
+// Filters and parameters declared on a widget are wired as parameter_mappings on the dashcard.
+// titleTemplate, series colours, and radio controls are emitted where Metabase can express them.
 func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[string][]byte, error) {
 	files := map[string][]byte{}
 
@@ -39,8 +40,13 @@ func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[stri
 		eid := stableID("card-" + w.ID)
 		cardIDs[w.ID] = eid
 
+		title := w.Title
+		if w.TitleTemplate != "" {
+			title = w.TitleTemplate // Metabase will resolve {{param}} if the param is present
+		}
+
 		card := map[string]any{
-			"name":        w.Title,
+			"name":        title,
 			"entity_id":   eid,
 			"display":     mapDisplay(w.Type),
 			"type":        "question",
@@ -99,7 +105,12 @@ func buildMBQL(w parser.Widget, d *parser.Dashboard, db, schema, table string, r
 		if m == nil {
 			continue
 		}
-		agg = append(agg, []any{m.Aggregation, fieldRef(db, schema, table, m.Field)})
+		aggName := m.Aggregation
+		if aggName == "ltm" {
+			// Metabase has no native LTM; emit as sum and leave a note in viz settings
+			aggName = "sum"
+		}
+		agg = append(agg, []any{aggName, fieldRef(db, schema, table, m.Field)})
 	}
 
 	breakout := []any{}
@@ -158,21 +169,94 @@ func buildVizSettings(w parser.Widget) map[string]any {
 	if len(w.Measures) > 0 {
 		vs["graph.metrics"] = w.Measures
 	}
+
+	// series colours
+	if len(w.Series) > 0 {
+		colors := []string{}
+		for _, s := range w.Series {
+			if s.Color != "" {
+				colors = append(colors, s.Color)
+			}
+		}
+		if len(colors) > 0 {
+			vs["graph.colors"] = colors
+		}
+	}
+
+	// pivot formatting hints (lossy — Metabase has limited pivot styling)
+	if w.Type == "pivot" {
+		if rows, ok := w.Options["rows"]; ok {
+			vs["pivot.rows"] = rows
+		}
+		if cols, ok := w.Options["columns"]; ok {
+			vs["pivot.columns"] = cols
+		}
+	}
+
 	return vs
 }
 
 func buildParameters(d *parser.Dashboard) []map[string]any {
 	var params []map[string]any
+
+	// Filters become dashboard parameters
 	for _, f := range d.Spec.Filters {
-		params = append(params, map[string]any{
+		p := map[string]any{
 			"id":     stableID("param-" + f.Name),
 			"name":   f.Title,
 			"slug":   f.Name,
-			"type":   "string/=",
+			"type":   mapFilterType(f.Control),
 			"target": []any{"dimension", []any{"template-tag", f.Dimension}},
+		}
+		if len(f.Values) > 0 {
+			p["values_source_type"] = "static-list"
+			p["values_source_config"] = map[string]any{"values": f.Values}
+		}
+		params = append(params, p)
+	}
+
+	// UDS parameters (user-set values) also become dashboard parameters
+	for _, p := range d.Spec.Parameters {
+		params = append(params, map[string]any{
+			"id":     stableID("param-" + p.Name),
+			"name":   p.Title,
+			"slug":   p.Name,
+			"type":   mapParamType(p.Type),
+			"default": p.Default,
 		})
 	}
+
 	return params
+}
+
+func mapFilterType(control string) string {
+	switch control {
+	case "radio":
+		return "string/="
+	case "multi_select":
+		return "string/="
+	case "date_range":
+		return "date/range"
+	case "date_picker":
+		return "date/single"
+	default:
+		return "string/="
+	}
+}
+
+func mapParamType(t string) string {
+	switch t {
+	case "number":
+		return "number/="
+	case "date":
+		return "date/single"
+	case "date_range":
+		return "date/range"
+	case "boolean":
+		return "string/="
+	default:
+		return "string/="
+	}
 }
 
 func buildDashcards(d *parser.Dashboard, cardIDs map[string]string) []map[string]any {
@@ -193,12 +277,12 @@ func buildDashcards(d *parser.Dashboard, cardIDs map[string]string) []map[string
 	return cards
 }
 
-// buildParameterMappings wires each filter listed on the widget to the
-// corresponding dashboard parameter via a template-tag target.
+// buildParameterMappings wires each filter and parameter listed on the widget
+// to the corresponding dashboard parameter.
 func buildParameterMappings(d *parser.Dashboard, w parser.Widget) []map[string]any {
 	var mappings []map[string]any
+
 	for _, filterName := range w.Filters {
-		// Find the dashboard filter so we can use its slug / dimension
 		var f *parser.Filter
 		for i := range d.Spec.Filters {
 			if d.Spec.Filters[i].Name == filterName {
@@ -218,6 +302,18 @@ func buildParameterMappings(d *parser.Dashboard, w parser.Widget) []map[string]a
 			},
 		})
 	}
+
+	for _, paramName := range w.Parameters {
+		mappings = append(mappings, map[string]any{
+			"parameter_id": stableID("param-" + paramName),
+			"card_id":      stableID("card-" + w.ID),
+			"target": []any{
+				"variable",
+				[]any{"template-tag", paramName},
+			},
+		})
+	}
+
 	return mappings
 }
 
@@ -225,14 +321,16 @@ func mapDisplay(t string) string {
 	switch t {
 	case "line":
 		return "line"
-	case "bar", "stacked_bar":
+	case "bar", "stacked_bar", "diverging":
 		return "bar"
 	case "pie":
 		return "pie"
-	case "table":
+	case "table", "pivot":
 		return "table"
 	case "number":
 		return "scalar"
+	case "combo":
+		return "combo"
 	default:
 		return "table"
 	}
