@@ -13,15 +13,13 @@ parameters:
     type: string
     values: [Monthly, LTM]
     affects: measure
+    swaps:
+      Monthly: revenue
+      LTM: revenue_ltm
     default: Monthly
-  - name: currency
-    title: Currency View
-    type: string
-    values: [Reported, Constant]
-    affects: measure
 ```
 
-`affects` says what the parameter changes: `measure`, `dimension`, `title`, `filter`, or `option`.
+`swaps` maps each allowed value to the measure name that should be used.
 
 ## Filter controls
 
@@ -31,67 +29,43 @@ filters:
     dimension: recurring_flag
     control: radio
     values: [Recurring, Non-Recurring]
-  - name: region_filter
-    dimension: region
-    control: multi_select
-    multi: true
 ```
 
-`control` now includes `radio`.
+`values` is now a defined schema property on filters.
 
-## Dynamic titles
-
-```yaml
-- id: arr_trend
-  title: Monthly ARR
-  titleTemplate: "{{period}} ARR"
-  parameters: [period]
-```
-
-## Combo and diverging charts
-
-New widget types: `combo` and `diverging`.
-
-## Series styling
+## Series on combo charts
 
 ```yaml
 series:
   - name: revenue
+    type: bar
+    axis: left
     color: "#1f77b4"
-    tooltipFields: [deal_count, avg_deal_size]
+  - name: margin
+    type: line
+    axis: right
+    color: "#ff7f0e"
 ```
 
-## Pivot formatting
+## Layout units
 
-Use `options` on a `pivot` widget:
-
-```yaml
-options:
-  rows: [region]
-  columns: [product]
-  groupedHeaders: true
-  boldTotals: true
-  bracketNegatives: true
-  conditionalColors:
-    - field: revenue
-      when: "< 0"
-      color: "#d62728"
-```
+See [layout.md](layout.md). One row unit ≈ 30px in most targets.
 
 ## LTM
 
-`ltm` is a valid measure aggregation (last-twelve-months). Semantic models can also declare an LTM metric type.
+`ltm` is a valid measure aggregation and a valid metric type in both dashboards and semantic models.
 
 ## Status
 
 | Feature                       | Schema | Parser | Metabase emitter |
 |-------------------------------|--------|--------|------------------|
-| Parameters + values + affects | yes    | yes    | partial          |
-| Radio control                 | yes    | yes    | yes (as string/=)|
-| Dynamic titles                | yes    | yes    | yes (titleTemplate)|
-| Combo / diverging             | yes    | yes    | partial          |
-| Series colours + tooltips     | yes    | yes    | colours only     |
+| Parameters + values + swaps   | yes    | yes    | partial          |
+| Radio + filter values         | yes    | yes    | yes              |
+| Dynamic titles                | yes    | yes    | yes              |
+| Combo series type/axis        | yes    | yes    | partial          |
+| Series colours                | yes    | yes    | yes              |
 | Pivot formatting              | yes    | yes    | rows/columns only|
-| LTM aggregation               | yes    | yes    | emitted as sum   |
+| LTM (dashboard + semantic)    | yes    | yes    | emitted as sum   |
+| Layout units documented       | yes    | —      | —                |
 
-These are additive. Existing specs remain valid. The Metabase emitter now consumes the new fields where the target can express them; other emitters still need the same treatment.
+These are additive. Existing specs remain valid.
