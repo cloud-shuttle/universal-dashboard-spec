@@ -23,6 +23,7 @@ type EmitOptions struct {
 // Source table is taken from the UDS spec.source block, then overridden by opts if non-empty.
 // Intent drives additional visualization and query settings (sort, stacking, goal line).
 // If reg is non-nil, qualified measure/dimension names (model.name) are resolved against it.
+// Filters declared on a widget are wired as parameter_mappings on the dashcard.
 func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[string][]byte, error) {
 	files := map[string][]byte{}
 
@@ -177,17 +178,47 @@ func buildParameters(d *parser.Dashboard) []map[string]any {
 func buildDashcards(d *parser.Dashboard, cardIDs map[string]string) []map[string]any {
 	var cards []map[string]any
 	for i, w := range d.Spec.Widgets {
+		mappings := buildParameterMappings(d, w)
 		cards = append(cards, map[string]any{
-			"id":         i + 1,
-			"card_id":    cardIDs[w.ID],
-			"row":        w.Layout.Y,
-			"col":        w.Layout.X,
-			"size_x":     w.Layout.W,
-			"size_y":     w.Layout.H,
-			"entity_id":  stableID("dashcard-" + w.ID),
+			"id":                 i + 1,
+			"card_id":            cardIDs[w.ID],
+			"row":                w.Layout.Y,
+			"col":                w.Layout.X,
+			"size_x":             w.Layout.W,
+			"size_y":             w.Layout.H,
+			"entity_id":          stableID("dashcard-" + w.ID),
+			"parameter_mappings": mappings,
 		})
 	}
 	return cards
+}
+
+// buildParameterMappings wires each filter listed on the widget to the
+// corresponding dashboard parameter via a template-tag target.
+func buildParameterMappings(d *parser.Dashboard, w parser.Widget) []map[string]any {
+	var mappings []map[string]any
+	for _, filterName := range w.Filters {
+		// Find the dashboard filter so we can use its slug / dimension
+		var f *parser.Filter
+		for i := range d.Spec.Filters {
+			if d.Spec.Filters[i].Name == filterName {
+				f = &d.Spec.Filters[i]
+				break
+			}
+		}
+		if f == nil {
+			continue
+		}
+		mappings = append(mappings, map[string]any{
+			"parameter_id": stableID("param-" + f.Name),
+			"card_id":      stableID("card-" + w.ID),
+			"target": []any{
+				"dimension",
+				[]any{"template-tag", f.Dimension},
+			},
+		})
+	}
+	return mappings
 }
 
 func mapDisplay(t string) string {
