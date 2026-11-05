@@ -21,13 +21,18 @@ These cover Stephen Few’s seven quantitative relationships plus the practical 
 
 Optional future extensions (not yet in the schema enum): `flow` (Sankey/funnel), `geographic`, `hierarchy` (treemap/sunburst).
 
-## Why this exists
+## Validation
 
-- **Semantic over syntactic** — declare the message; the encoding follows.
-- **LLM-authorable** — agents pick an intent first, then a valid type + options. Fewer hallucinations.
-- **Validation** — a `pie` with intent `ranking` or `time_series` can be flagged.
-- **Honest about lossiness** — document which intents survive cleanly on each target (Metabase, Grafana, ECharts, Excalidraw, etc.).
-- **Visual review** — Excalidraw mocks can surface the intended message.
+The CLI and parser run a lightweight check on load:
+
+- Unknown `intent` values are **errors** (hard fail).
+- A known intent paired with a non-preferred `type` produces a **warning** on stderr. Compilation still succeeds so existing specs remain valid.
+- Missing intent is always fine (optional in v1).
+
+Example warning:
+```
+warning: widget "deals_by_region" (Deals by Region): intent "ranking" prefers [bar], got type "pie"
+```
 
 ## Mapping guidance
 
@@ -39,6 +44,12 @@ Optional future extensions (not yet in the schema enum): `flow` (Sankey/funnel),
 | `deviation` | 1 measure (+ reference) | reference line / target |
 | `correlation` | 2 measures | trend line optional |
 | `lookup` | any | exact values, no aggregation needed for tables |
+
+## Target notes (lossiness)
+
+- **Metabase / Lightdash / Grafana**: Most intents map cleanly. Ranking requires the target to honour sort order. Deviation needs a goal/reference line setting. Pie charts for part-to-whole are lossy for precise comparison on every target.
+- **ECharts**: Full control; markLine for deviation, sorting is client-side.
+- **Excalidraw**: Intent is not visualised yet (colour is by chart type). Future mocks can annotate the intended message.
 
 ## Sources
 

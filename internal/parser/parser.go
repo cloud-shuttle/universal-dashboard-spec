@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -59,6 +60,7 @@ type Tab struct {
 type Widget struct {
 	ID         string         `yaml:"id"`
 	Type       string         `yaml:"type"`
+	Intent     string         `yaml:"intent,omitempty"`
 	Title      string         `yaml:"title"`
 	Tab        string         `yaml:"tab,omitempty"`
 	Measures   []string       `yaml:"measures,omitempty"`
@@ -75,6 +77,30 @@ type Layout struct {
 	H int `yaml:"h"`
 }
 
+// knownIntents is the canonical set from docs/taxonomy.md
+var knownIntents = map[string]bool{
+	"nominal_comparison": true,
+	"ranking":            true,
+	"time_series":        true,
+	"part_to_whole":      true,
+	"deviation":          true,
+	"distribution":       true,
+	"correlation":        true,
+	"lookup":             true,
+}
+
+// preferredTypes maps intent → preferred chart types. Empty means any is acceptable.
+var preferredTypes = map[string][]string{
+	"nominal_comparison": {"bar"},
+	"ranking":            {"bar"},
+	"time_series":        {"line", "area"},
+	"part_to_whole":      {"stacked_bar", "pie"},
+	"deviation":          {"bar", "line"},
+	"distribution":       {"bar", "heatmap"},
+	"correlation":        {"scatter", "heatmap"},
+	"lookup":             {"table", "number"},
+}
+
 func Load(path string) (*Dashboard, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -85,4 +111,37 @@ func Load(path string) (*Dashboard, error) {
 		return nil, err
 	}
 	return &d, nil
+}
+
+// Validate checks known intents and recommended type pairings.
+// Returns a list of warning messages (non-fatal) and an error only for hard failures
+// (unknown intent). Type mismatches are warnings so existing specs keep working.
+func (d *Dashboard) Validate() (warnings []string, err error) {
+	for i, w := range d.Spec.Widgets {
+		if w.Intent == "" {
+			continue
+		}
+		if !knownIntents[w.Intent] {
+			return nil, fmt.Errorf("widget %q (%s): unknown intent %q", w.ID, w.Title, w.Intent)
+		}
+		preferred, ok := preferredTypes[w.Intent]
+		if !ok {
+			continue
+		}
+		found := false
+		for _, p := range preferred {
+			if w.Type == p {
+				found = true
+				break
+			}
+		}
+		if !found {
+			warnings = append(warnings, fmt.Sprintf(
+				"widget %q (%s): intent %q prefers %v, got type %q",
+				w.ID, w.Title, w.Intent, preferred, w.Type,
+			))
+		}
+		_ = i // silence unused in case of future use
+	}
+	return warnings, nil
 }

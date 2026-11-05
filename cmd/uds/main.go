@@ -29,6 +29,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	warnings, err := dash.Validate()
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, w := range warnings {
+		fmt.Fprintln(os.Stderr, "warning:", w)
+	}
+
 	switch *target {
 	case "excalidraw":
 		data, err := excalidraw.Emit(dash)
