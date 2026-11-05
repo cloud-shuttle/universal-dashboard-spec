@@ -76,12 +76,14 @@ type Source struct {
 }
 
 type Parameter struct {
-	Name        string `yaml:"name"`
-	Title       string `yaml:"title,omitempty"`
-	Type        string `yaml:"type"`
-	Default     any    `yaml:"default,omitempty"`
-	Required    bool   `yaml:"required,omitempty"`
-	Description string `yaml:"description,omitempty"`
+	Name        string   `yaml:"name"`
+	Title       string   `yaml:"title,omitempty"`
+	Type        string   `yaml:"type"`
+	Values      []string `yaml:"values,omitempty"`
+	Affects     string   `yaml:"affects,omitempty"`
+	Default     any      `yaml:"default,omitempty"`
+	Required    bool     `yaml:"required,omitempty"`
+	Description string   `yaml:"description,omitempty"`
 }
 
 type Measure struct {
@@ -102,13 +104,14 @@ type Dimension struct {
 }
 
 type Filter struct {
-	Name        string `yaml:"name"`
-	Title       string `yaml:"title,omitempty"`
-	Dimension   string `yaml:"dimension"`
-	Control     string `yaml:"control,omitempty"`
-	Multi       bool   `yaml:"multi,omitempty"`
-	CascadeFrom string `yaml:"cascadeFrom,omitempty"`
-	Required    bool   `yaml:"required,omitempty"`
+	Name        string   `yaml:"name"`
+	Title       string   `yaml:"title,omitempty"`
+	Dimension   string   `yaml:"dimension"`
+	Control     string   `yaml:"control,omitempty"`
+	Values      []string `yaml:"values,omitempty"`
+	Multi       bool     `yaml:"multi,omitempty"`
+	CascadeFrom string   `yaml:"cascadeFrom,omitempty"`
+	Required    bool     `yaml:"required,omitempty"`
 }
 
 type Tab struct {
@@ -117,24 +120,32 @@ type Tab struct {
 }
 
 type Widget struct {
-	ID         string         `yaml:"id"`
-	Type       string         `yaml:"type"`
-	Intent     string         `yaml:"intent,omitempty"`
-	Title      string         `yaml:"title"`
-	Tab        string         `yaml:"tab,omitempty"`
-	Measures   []string       `yaml:"measures,omitempty"`
-	Dimensions []string       `yaml:"dimensions,omitempty"`
-	Filters    []string       `yaml:"filters,omitempty"`
-	Parameters []string       `yaml:"parameters,omitempty"`
-	Actions    []Action       `yaml:"actions,omitempty"`
-	Layout     Layout         `yaml:"layout"`
-	Options    map[string]any `yaml:"options,omitempty"`
+	ID            string         `yaml:"id"`
+	Type          string         `yaml:"type"`
+	Intent        string         `yaml:"intent,omitempty"`
+	Title         string         `yaml:"title"`
+	TitleTemplate string         `yaml:"titleTemplate,omitempty"`
+	Tab           string         `yaml:"tab,omitempty"`
+	Measures      []string       `yaml:"measures,omitempty"`
+	Dimensions    []string       `yaml:"dimensions,omitempty"`
+	Filters       []string       `yaml:"filters,omitempty"`
+	Parameters    []string       `yaml:"parameters,omitempty"`
+	Actions       []Action       `yaml:"actions,omitempty"`
+	Series        []Series       `yaml:"series,omitempty"`
+	Layout        Layout         `yaml:"layout"`
+	Options       map[string]any `yaml:"options,omitempty"`
+}
+
+type Series struct {
+	Name          string   `yaml:"name"`
+	Color         string   `yaml:"color,omitempty"`
+	TooltipFields []string `yaml:"tooltipFields,omitempty"`
 }
 
 type Action struct {
-	Type               string            `yaml:"type"`
-	Target             string            `yaml:"target,omitempty"`
-	ParameterMappings  map[string]string `yaml:"parameterMappings,omitempty"`
+	Type              string            `yaml:"type"`
+	Target            string            `yaml:"target,omitempty"`
+	ParameterMappings map[string]string `yaml:"parameterMappings,omitempty"`
 }
 
 type Layout struct {
@@ -170,7 +181,7 @@ type Entity struct {
 type Metric struct {
 	Name        string `yaml:"name"`
 	Title       string `yaml:"title,omitempty"`
-	Type        string `yaml:"type"` // simple | ratio | cumulative | derived
+	Type        string `yaml:"type"` // simple | ratio | cumulative | derived | ltm
 	Description string `yaml:"description,omitempty"`
 	Measure     string `yaml:"measure,omitempty"`
 	Numerator   string `yaml:"numerator,omitempty"`
@@ -198,7 +209,7 @@ var preferredTypes = map[string][]string{
 	"ranking":            {"bar"},
 	"time_series":        {"line", "area"},
 	"part_to_whole":      {"stacked_bar", "pie"},
-	"deviation":          {"bar", "line"},
+	"deviation":          {"bar", "line", "diverging"},
 	"distribution":       {"bar", "heatmap"},
 	"correlation":        {"scatter", "heatmap"},
 	"lookup":             {"table", "number", "pivot"},
