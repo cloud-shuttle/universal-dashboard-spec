@@ -11,3 +11,5 @@ layout: { x: 0, y: 0, w: 16, h: 8 }  # 16 columns wide, 8 rows tall (~240px)
 ```
 
 Widgets must not overlap. Tabs are independent grids.
+
+Metabase copies `x`, `y`, `w`, `h` onto the dashcard as `col`, `row`, `size_x`, `size_y`. Excalidraw uses 32px per column and 36px per row. ECharts does not draw a grid.

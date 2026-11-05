@@ -84,7 +84,7 @@ Set `expression` instead of `aggregation`. The vocabulary is measure names, numb
       value: Lost
 ```
 
-Semantic metrics of `type: derived` are unchanged. This field is for measures.
+That expression field is on a measure. A SemanticModel can also name the same idea as a metric: `ratio` (numerator / denominator) or `derived` (an expression). Metabase compiles both to MBQL. Cube compiles `ratio` only. `cumulative` stays in the schema and is not compiled.
 
 ## Numeric dimensions
 
@@ -163,5 +163,13 @@ Query structure is in the schema. These presentation and interaction details are
 | `text` / `image` widgets      | yes    | yes    | virtual text card |
 | Widget `fixedFilters`         | yes    | yes    | query `filter`   |
 | Pivot `rows` / `columns`      | yes    | yes    | measures stay in the listed bucket |
+| Semantic metric `simple` / `ltm` | yes | yes  | the measure, or an `offset` window |
+| Semantic metric `ratio` / `derived` | yes | yes | MBQL expression |
+| Semantic metric `cumulative`  | yes    | yes    | skipped, with a warning |
+| Model source                  | yes    | yes    | model table, else dashboard source, else Sample Database / PUBLIC / ORDERS, with a warning |
+| Model join                    | yes    | yes    | left join only for a query field; one side must be `primary`; a filter does not join |
+| `-database` / `-schema` / `-table` | — | — | `-database` on every table; `-schema` and `-table` on the base table |
+| Widget `actions`              | yes    | yes    | not emitted |
+| Parameter `swaps`             | yes    | yes    | stored on the parameter; the card measure is not swapped |
 
-These are additive. Existing specs remain valid.
+These are additive. Existing specs remain valid. Lightdash and Grafana have no emitter. ECharts, Excalidraw, and Cube coverage is in [targets.md](targets.md) and [cross-target.md](cross-target.md).

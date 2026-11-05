@@ -39,13 +39,7 @@ warning: widget "deals_by_region" (Deals by Region): intent "ranking" prefers [b
 
 ## Visual review (Excalidraw)
 
-Widget labels in the Excalidraw mock now show:
-```
-{type}
-{intent}   ← only when present
-{title}
-```
-Colour remains driven by chart type so the layout is still instantly scannable.
+Widget labels show the type, the intent when set, and the title. They also show `timeGrain`, fixed filters, series type and axis, and the measure title when those are set. Colour stays driven by chart type. The full mock is described in [targets.md](targets.md).
 
 ## Mapping guidance
 

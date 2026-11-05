@@ -66,14 +66,15 @@ spec:
 
 ## Core concepts (kept deliberately small)
 
-- **entities** — join keys (`primary` or `foreign`). Required for multi-model joins later.
+- **entities** — join keys (`primary` or `foreign`). Metabase joins two models on a shared entity name only when one side is `primary`.
 - **dimensions** — attributes to group or filter by. Types: `categorical`, `time`, or `number`. Time dimensions declare allowed `grains`.
 - **measures** — atomic aggregations (`sum`, `count`, `count_distinct`, `avg`, `min`, `max`, `ltm`) or an `expression` over other measures (`closing - opening`). A measure may set `where` on either form. On an expression, the predicate applies to every measure the expression uses. Set `aggregation` or `expression`, not both.
 - **metrics** — business metrics built from measures. Supported types in v1:
-  - `simple` (default) — just the measure
-  - `ratio` — numerator / denominator
-  - `cumulative` — running total or grain-to-date
-  - `derived` — simple expression over other metrics (restricted vocabulary; no free-form SQL)
+  - `simple` — the named measure. Metabase emits that measure.
+  - `ltm` — a trailing window of the named measure. Metabase emits the same `offset` window as a measure `ltm`. Cube does not emit metric `ltm`. A measure with `aggregation: ltm` is what Cube turns into a 12-month `rolling_window`.
+  - `ratio` — numerator / denominator. Metabase emits MBQL `/`. Cube emits `{numerator} / {denominator}`.
+  - `derived` — an expression over measures or other metrics, same vocabulary as a measure expression. Metabase emits MBQL `+ - * /`. Cube does not emit it.
+  - `cumulative` — running total or grain-to-date (`input_metric`, `grain_to_date`). The schema accepts it. Metabase skips it and prints a warning. Cube does not emit it.
 
 ## Referencing from a Dashboard
 
@@ -101,14 +102,14 @@ Metabase uses the source table of the model that owns the card's first measure. 
 
 ## Compilation targets
 
-The SemanticModel is designed to transpile cleanly to:
+Implemented in this repo:
 
-- Cube YAML (`cubes:` with measures + dimensions)
-- dbt Semantic Layer / MetricFlow YAML (and therefore the emerging Open Semantic Interchange / Apache Ossie format)
-- Lightdash native YAML
-- Metabase metrics (where the target supports them)
+- **Cube** (`-target cube`) writes `cubes:` with dimensions, measures, measure expressions, measure `where`, measure `ltm`, and `ratio` metrics. The CLI emits the first model given to `-models`.
+- **Metabase** inlines the resolved measure or metric into the card's MBQL aggregation. It does not emit a separate Metabase metric entity. Joins and source rules are in the section above.
+- **Excalidraw** shows the SemanticModel measure or metric title on the widget label when `-models` loaded that model.
+- **ECharts** does not read the registry. Qualified names stay as the widget wrote them, and the series data is a placeholder.
 
-Dashboards continue to compile to the existing targets (Metabase, Lightdash DAC, Grafana, ECharts, Excalidraw). When a dashboard references a SemanticModel, the emitter can either inline the resolved measures or emit a reference if the target supports it.
+Designed so a later emitter can target them, and not implemented here: dbt Semantic Layer / MetricFlow, Lightdash native YAML, and Grafana.
 
 ## Design constraints (inherited from UDS)
 
