@@ -1,0 +1,55 @@
+apiVersion: uds/v1
+kind: SemanticModel
+metadata:
+  name: orders
+  title: Orders
+  description: Core order facts used by sales dashboards
+
+spec:
+  source:
+    database: analytics
+    schema: marts
+    table: fct_orders
+
+  entities:
+    - name: order
+      type: primary
+      field: order_id
+    - name: customer
+      type: foreign
+      field: customer_id
+
+  dimensions:
+    - name: ordered_at
+      type: time
+      field: ordered_at
+      grains: [day, week, month, quarter, year]
+    - name: region
+      type: categorical
+      field: region
+    - name: product
+      type: categorical
+      field: product_name
+
+  measures:
+    - name: revenue
+      title: Revenue
+      aggregation: sum
+      field: amount
+      format: currency
+    - name: order_count
+      title: Order Count
+      aggregation: count
+      field: order_id
+    - name: avg_order_value_raw
+      title: Average Order Value (raw)
+      aggregation: avg
+      field: amount
+
+  metrics:
+    - name: avg_order_value
+      title: Average Order Value
+      type: ratio
+      numerator: revenue
+      denominator: order_count
+      description: Revenue divided by order count

@@ -27,7 +27,7 @@ You are writing a Universal Dashboard Specification (UDS) YAML file.
        table: orders
    ```
 
-5. **Measures and dimensions** are declared once at the top and referenced by name in widgets.
+5. **Measures and dimensions** are declared once at the top and referenced by name in widgets. Prefer a separate `kind: SemanticModel` (see `docs/semantic-model.md`) when the same metrics will be reused across dashboards.
 
 6. Keep the file small and regular. Prefer the example in `examples/sales-overview.yaml` as a template.
 

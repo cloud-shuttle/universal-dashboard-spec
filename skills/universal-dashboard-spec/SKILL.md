@@ -63,7 +63,11 @@ spec:
       layout: { x: 0, y: 0, w: 16, h: 8 }
 ```
 
-## Validation and compilation
+## Semantic models (optional)
+
+For reusable metrics, author a separate `kind: SemanticModel` (see the repo’s `docs/semantic-model.md` and `schema/semantic-model.json`). Dashboards can then reference measures with qualified names such as `orders.revenue`.
+
+Inline measures on the Dashboard remain valid for simple single-table cases.
 
 ```bash
 go run ./cmd/uds -in path.yaml -target excalidraw -out out.excalidraw

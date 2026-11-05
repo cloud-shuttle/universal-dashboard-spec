@@ -28,6 +28,8 @@ See [docs/taxonomy.md](docs/taxonomy.md) for the full list, preferred encodings,
 
 ## High-level structure
 
+Dashboards:
+
 ```yaml
 apiVersion: uds/v1
 kind: Dashboard
@@ -43,7 +45,22 @@ spec:
   widgets: [...]
 ```
 
-See `schema/dashboard.json` for the full JSON Schema and `examples/` for worked examples.
+Semantic models (metrics layer):
+
+```yaml
+apiVersion: uds/v1
+kind: SemanticModel
+metadata:
+  name: orders
+  title: Orders
+spec:
+  entities: [...]
+  dimensions: [...]
+  measures: [...]
+  metrics: [...]
+```
+
+See `schema/dashboard.json` and `schema/semantic-model.json` for the full JSON Schemas, `docs/semantic-model.md` for the metrics-layer design, and `examples/` for worked examples.
 
 ## Try the CLI
 

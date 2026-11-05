@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cloud-shuttle/universal-dashboard-spec/schema/semantic-model.json",
+  "title": "UDS Semantic Model (Metrics Layer)",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "const": "uds/v1" },
+    "kind": { "const": "SemanticModel" },
+    "metadata": {
+      "type": "object",
+      "required": ["name", "title"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "title": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["measures", "dimensions"],
+      "properties": {
+        "source": { "$ref": "#/$defs/source" },
+        "entities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/entity" }
+        },
+        "dimensions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dimension" }
+        },
+        "measures": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/measure" }
+        },
+        "metrics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/metric" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "description": "Physical source table or view.",
+      "properties": {
+        "database": { "type": "string" },
+        "schema": { "type": "string" },
+        "table": { "type": "string" }
+      }
+    },
+    "entity": {
+      "type": "object",
+      "required": ["name", "type", "field"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "enum": ["primary", "foreign"] },
+        "field": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "dimension": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "enum": ["categorical", "time"] },
+        "field": { "type": "string" },
+        "grains": {
+          "type": "array",
+          "items": { "enum": ["day", "week", "month", "quarter", "year"] },
+          "description": "Allowed time grains (only for type=time)"
+        },
+        "description": { "type": "string" }
+      }
+    },
+    "measure": {
+      "type": "object",
+      "required": ["name", "aggregation"],
+      "properties": {
+        "name": { "type": "string" },
+        "title": { "type": "string" },
+        "aggregation": {
+          "enum": ["sum", "count", "count_distinct", "avg", "min", "max"]
+        },
+        "field": { "type": "string" },
+        "format": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "enum": ["simple", "ratio", "cumulative", "derived"] },
+        "description": { "type": "string" },
+        "measure": { "type": "string", "description": "For type=simple" },
+        "numerator": { "type": "string", "description": "For type=ratio" },
+        "denominator": { "type": "string", "description": "For type=ratio" },
+        "input_metric": { "type": "string", "description": "For type=cumulative" },
+        "grain_to_date": { "enum": ["day", "week", "month", "quarter", "year"] },
+        "expression": { "type": "string", "description": "Restricted expression for type=derived" }
+      }
+    }
+  }
+}
