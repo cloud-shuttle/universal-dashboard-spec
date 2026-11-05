@@ -83,7 +83,7 @@
         "name": { "type": "string" },
         "title": { "type": "string" },
         "aggregation": {
-          "enum": ["sum", "count", "count_distinct", "avg", "min", "max"]
+          "enum": ["sum", "count", "count_distinct", "avg", "min", "max", "ltm"]
         },
         "field": { "type": "string" },
         "format": { "type": "string" },
@@ -96,9 +96,9 @@
       "properties": {
         "name": { "type": "string" },
         "title": { "type": "string" },
-        "type": { "enum": ["simple", "ratio", "cumulative", "derived"] },
+        "type": { "enum": ["simple", "ratio", "cumulative", "derived", "ltm"] },
         "description": { "type": "string" },
-        "measure": { "type": "string", "description": "For type=simple" },
+        "measure": { "type": "string", "description": "For type=simple or type=ltm" },
         "numerator": { "type": "string", "description": "For type=ratio" },
         "denominator": { "type": "string", "description": "For type=ratio" },
         "input_metric": { "type": "string", "description": "For type=cumulative" },
