@@ -108,6 +108,19 @@
             "heatmap"
           ]
         },
+        "intent": {
+          "description": "Analytical message the widget is meant to convey. Optional in v1; see docs/taxonomy.md. Helps LLMs, validation, and multi-target compilation.",
+          "enum": [
+            "nominal_comparison",
+            "ranking",
+            "time_series",
+            "part_to_whole",
+            "deviation",
+            "distribution",
+            "correlation",
+            "lookup"
+          ]
+        },
         "title": { "type": "string" },
         "tab": { "type": "string" },
         "measures": { "type": "array", "items": { "type": "string" } },

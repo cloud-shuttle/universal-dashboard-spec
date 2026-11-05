@@ -4,7 +4,7 @@ A thin, LLM-friendly YAML language for describing dashboards once, then compilin
 
 ## Goals
 
-- **Single source of intent** — measures, dimensions, filters, layout, and chart types live in one place.
+- **Single source of intent** — measures, dimensions, filters, layout, chart types, and analytical messages live in one place.
 - **LLM-authorable** — deliberately smaller and more regular than any vendor format so agents get it right.
 - **Human-reviewable** — readable by people and renderable as an Excalidraw mock before any data is connected.
 - **Multi-target** — compile to Metabase, Lightdash, Grafana, ECharts, and more.
@@ -12,11 +12,17 @@ A thin, LLM-friendly YAML language for describing dashboards once, then compilin
 
 ## Design Principles
 
-1. Semantic over syntactic — declare what you want measured and sliced, not the SQL.
+1. Semantic over syntactic — declare what you want measured and sliced, and the message you want to convey, not the SQL.
 2. Minimal vocabulary — fewer concepts = fewer ways for an LLM to hallucinate.
 3. Explicit layout — 24-column grid so position is deterministic.
 4. Honest about lossiness — document what does not survive compilation to each target.
 5. Visual review gate — Excalidraw output is a first-class deliverable.
+
+## Message taxonomy
+
+Widgets can declare an optional `intent` (analytical message) drawn from a small canonical set. This makes the spec more robust for LLMs, validation, and multi-target compilation.
+
+See [docs/taxonomy.md](docs/taxonomy.md) for the full list, preferred encodings, and rationale (based on Stephen Few’s quantitative messages and common BI practice).
 
 ## High-level structure
 

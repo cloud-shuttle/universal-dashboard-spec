@@ -55,6 +55,7 @@ spec:
   widgets:
     - id: revenue_over_time
       type: line
+      intent: time_series
       title: Revenue over Time
       tab: overview
       measures: [revenue]
@@ -66,6 +67,7 @@ spec:
 
     - id: deals_by_region
       type: bar
+      intent: ranking
       title: Deals by Region
       tab: overview
       measures: [deal_count]
@@ -75,6 +77,7 @@ spec:
 
     - id: revenue_by_product
       type: stacked_bar
+      intent: part_to_whole
       title: Revenue by Product
       tab: by_product
       measures: [revenue]
