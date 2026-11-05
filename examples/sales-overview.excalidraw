@@ -6,58 +6,104 @@
     {
       "id": "tab-overview",
       "type": "rectangle",
-      "x": 40, "y": 40, "width": 120, "height": 40,
+      "x": 40,
+      "y": 40,
+      "width": 120,
+      "height": 40,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "#e7f5ff",
       "fillStyle": "solid",
-      "label": { "text": "Overview" }
+      "label": {
+        "text": "Overview"
+      }
     },
     {
-      "id": "tab-by-product",
+      "id": "tab-by_product",
       "type": "rectangle",
-      "x": 170, "y": 40, "width": 120, "height": 40,
+      "x": 180,
+      "y": 40,
+      "width": 120,
+      "height": 40,
       "strokeColor": "#1e1e1e",
-      "backgroundColor": "#f8f9fa",
+      "backgroundColor": "#e7f5ff",
       "fillStyle": "solid",
-      "label": { "text": "By Product" }
+      "label": {
+        "text": "By Product"
+      }
     },
     {
-      "id": "filter-date",
+      "id": "filter-date_range",
       "type": "rectangle",
-      "x": 40, "y": 100, "width": 140, "height": 32,
+      "x": 40,
+      "y": 100,
+      "width": 140,
+      "height": 32,
       "strokeColor": "#1971c2",
       "backgroundColor": "#e7f5ff",
       "fillStyle": "solid",
-      "label": { "text": "Date Range" }
+      "label": {
+        "text": "Date Range"
+      }
     },
     {
-      "id": "filter-region",
+      "id": "filter-region_filter",
       "type": "rectangle",
-      "x": 190, "y": 100, "width": 120, "height": 32,
+      "x": 200,
+      "y": 100,
+      "width": 140,
+      "height": 32,
       "strokeColor": "#1971c2",
       "backgroundColor": "#e7f5ff",
       "fillStyle": "solid",
-      "label": { "text": "Region" }
+      "label": {
+        "text": "Region"
+      }
     },
     {
-      "id": "widget-revenue-over-time",
+      "id": "widget-revenue_over_time",
       "type": "rectangle",
-      "x": 40, "y": 160, "width": 520, "height": 280,
+      "x": 40,
+      "y": 160,
+      "width": 512,
+      "height": 288,
       "strokeColor": "#2f9e44",
       "backgroundColor": "#ebfbee",
       "fillStyle": "solid",
-      "label": { "text": "Line\nRevenue over Time" }
+      "label": {
+        "text": "line\ntime_series\nRevenue over Time"
+      }
     },
     {
-      "id": "widget-deals-by-region",
+      "id": "widget-deals_by_region",
       "type": "rectangle",
-      "x": 580, "y": 160, "width": 260, "height": 280,
+      "x": 552,
+      "y": 160,
+      "width": 256,
+      "height": 288,
       "strokeColor": "#e8590c",
       "backgroundColor": "#fff4e6",
       "fillStyle": "solid",
-      "label": { "text": "Bar\nDeals by Region" }
+      "label": {
+        "text": "bar\nranking\nDeals by Region"
+      }
+    },
+    {
+      "id": "widget-revenue_by_product",
+      "type": "rectangle",
+      "x": 40,
+      "y": 160,
+      "width": 768,
+      "height": 360,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid",
+      "label": {
+        "text": "stacked_bar\npart_to_whole\nRevenue by Product"
+      }
     }
   ],
-  "appState": { "viewBackgroundColor": "#ffffff" },
+  "appState": {
+    "viewBackgroundColor": "#ffffff"
+  },
   "files": {}
 }
