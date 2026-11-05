@@ -21,11 +21,18 @@ type Metadata struct {
 }
 
 type Spec struct {
+	Source     *Source     `yaml:"source,omitempty"`
 	Measures   []Measure   `yaml:"measures"`
 	Dimensions []Dimension `yaml:"dimensions"`
 	Filters    []Filter    `yaml:"filters,omitempty"`
 	Tabs       []Tab       `yaml:"tabs,omitempty"`
 	Widgets    []Widget    `yaml:"widgets"`
+}
+
+type Source struct {
+	Database string `yaml:"database,omitempty"`
+	Schema   string `yaml:"schema,omitempty"`
+	Table    string `yaml:"table,omitempty"`
 }
 
 type Measure struct {
@@ -144,4 +151,21 @@ func (d *Dashboard) Validate() (warnings []string, err error) {
 		_ = i // silence unused in case of future use
 	}
 	return warnings, nil
+}
+
+// SourceOrDefault returns the source from the spec, or the provided defaults
+// when the spec does not declare one.
+func (d *Dashboard) SourceOrDefault(db, schema, table string) (string, string, string) {
+	if d.Spec.Source != nil {
+		if d.Spec.Source.Database != "" {
+			db = d.Spec.Source.Database
+		}
+		if d.Spec.Source.Schema != "" {
+			schema = d.Spec.Source.Schema
+		}
+		if d.Spec.Source.Table != "" {
+			table = d.Spec.Source.Table
+		}
+	}
+	return db, schema, table
 }
