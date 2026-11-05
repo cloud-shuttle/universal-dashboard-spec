@@ -20,6 +20,7 @@
       "type": "object",
       "required": ["measures", "dimensions", "widgets"],
       "properties": {
+        "source": { "$ref": "#/$defs/source" },
         "measures": {
           "type": "array",
           "items": { "$ref": "#/$defs/measure" }
@@ -44,6 +45,15 @@
     }
   },
   "$defs": {
+    "source": {
+      "type": "object",
+      "description": "Optional source table for compilation targets that need it (e.g. Metabase).",
+      "properties": {
+        "database": { "type": "string" },
+        "schema": { "type": "string" },
+        "table": { "type": "string" }
+      }
+    },
     "measure": {
       "type": "object",
       "required": ["name", "aggregation"],
