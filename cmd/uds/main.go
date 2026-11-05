@@ -17,6 +17,7 @@ func main() {
 		input  = flag.String("in", "", "Path to UDS YAML file")
 		target = flag.String("target", "excalidraw", "Target: excalidraw | metabase")
 		out    = flag.String("out", "", "Output path (directory or file)")
+		strict = flag.Bool("strict", false, "Treat intent/type mismatches as errors")
 	)
 	flag.Parse()
 
@@ -32,6 +33,12 @@ func main() {
 	warnings, err := dash.Validate()
 	if err != nil {
 		log.Fatal(err)
+	}
+	if *strict && len(warnings) > 0 {
+		for _, w := range warnings {
+			fmt.Fprintln(os.Stderr, "error:", w)
+		}
+		log.Fatal("strict mode: intent/type mismatches")
 	}
 	for _, w := range warnings {
 		fmt.Fprintln(os.Stderr, "warning:", w)

@@ -28,11 +28,22 @@ The CLI and parser run a lightweight check on load:
 - Unknown `intent` values are **errors** (hard fail).
 - A known intent paired with a non-preferred `type` produces a **warning** on stderr. Compilation still succeeds so existing specs remain valid.
 - Missing intent is always fine (optional in v1).
+- Pass `--strict` to promote those warnings to fatal errors.
 
 Example warning:
 ```
 warning: widget "deals_by_region" (Deals by Region): intent "ranking" prefers [bar], got type "pie"
 ```
+
+## Visual review (Excalidraw)
+
+Widget labels in the Excalidraw mock now show:
+```
+{type}
+{intent}   ← only when present
+{title}
+```
+Colour remains driven by chart type so the layout is still instantly scannable.
 
 ## Mapping guidance
 
@@ -49,7 +60,7 @@ warning: widget "deals_by_region" (Deals by Region): intent "ranking" prefers [b
 
 - **Metabase / Lightdash / Grafana**: Most intents map cleanly. Ranking requires the target to honour sort order. Deviation needs a goal/reference line setting. Pie charts for part-to-whole are lossy for precise comparison on every target.
 - **ECharts**: Full control; markLine for deviation, sorting is client-side.
-- **Excalidraw**: Intent is not visualised yet (colour is by chart type). Future mocks can annotate the intended message.
+- **Excalidraw**: Intent appears in the widget label. Colour is still by chart type.
 
 ## Sources
 

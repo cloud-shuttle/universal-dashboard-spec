@@ -2,6 +2,7 @@ package excalidraw
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/parser"
 )
@@ -84,6 +85,11 @@ func Emit(d *parser.Dashboard) ([]byte, error) {
 	const rowH = 36
 	for _, w := range d.Spec.Widgets {
 		color := chartColor(w.Type)
+		label := w.Type
+		if w.Intent != "" {
+			label = w.Type + "\n" + w.Intent
+		}
+		label = label + "\n" + w.Title
 		f.Elements = append(f.Elements, Element{
 			ID:              "widget-" + w.ID,
 			Type:            "rectangle",
@@ -94,7 +100,7 @@ func Emit(d *parser.Dashboard) ([]byte, error) {
 			StrokeColor:     color,
 			BackgroundColor: lighten(color),
 			FillStyle:       "solid",
-			Label:           &Label{Text: w.Type + "\n" + w.Title},
+			Label:           &Label{Text: strings.TrimSpace(label)},
 		})
 	}
 
