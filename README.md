@@ -1,5 +1,7 @@
 # Universal Dashboard Specification (UDS)
 
+**Status: experimental.** The schema and CLI are usable today for describing dashboards and compiling them to Metabase, ECharts, and Excalidraw, but the format is still moving. Expect breaking changes as we add parameters, filter controls, pivots, and drill actions. Pin to a commit if you depend on it.
+
 A thin, LLM-friendly YAML language for describing dashboards once, then compiling that description to multiple targets.
 
 ## Goals
