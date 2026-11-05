@@ -1,0 +1,31 @@
+{
+  "skill": "universal-dashboard-spec",
+  "test_cases": [
+    {
+      "name": "author_simple_dashboard",
+      "input": "Write a UDS dashboard with a line chart of revenue over time and a bar chart of deals by region",
+      "assertions": [
+        "YAML has apiVersion uds/v1",
+        "Widgets have intent set",
+        "Line chart uses time_series intent",
+        "Bar chart uses ranking or nominal_comparison intent"
+      ]
+    },
+    {
+      "name": "add_intent_to_existing",
+      "input": "Add the correct intent to this widget that shows monthly revenue as a line",
+      "assertions": [
+        "Sets intent to time_series",
+        "Keeps type as line"
+      ]
+    },
+    {
+      "name": "include_source_for_metabase",
+      "input": "Create a UDS file that will compile to Metabase from the orders table",
+      "assertions": [
+        "Includes spec.source with database, schema, table",
+        "Widgets reference declared measures and dimensions"
+      ]
+    }
+  ]
+}
