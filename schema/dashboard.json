@@ -82,6 +82,11 @@
           "description": "What this parameter changes",
           "enum": ["measure", "dimension", "title", "filter", "option"]
         },
+        "swaps": {
+          "description": "Map of parameter value → measure name when affects=measure",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
         "default": {},
         "required": { "type": "boolean" },
         "description": { "type": "string" }
@@ -124,6 +129,11 @@
         "control": {
           "description": "UI control to render for this filter",
           "enum": ["dropdown", "multi_select", "radio", "date_picker", "date_range", "slider", "search"]
+        },
+        "values": {
+          "description": "Allowed values for radio / dropdown filters",
+          "type": "array",
+          "items": { "type": "string" }
         },
         "multi": { "type": "boolean" },
         "cascadeFrom": {
@@ -203,6 +213,7 @@
         "layout": {
           "type": "object",
           "required": ["x", "y", "w", "h"],
+          "description": "24-column grid. x/w are column units (0-23). y/h are row units. One row unit is approximately 30px in most targets; exact pixel height is target-dependent.",
           "properties": {
             "x": { "type": "integer", "minimum": 0, "maximum": 23 },
             "y": { "type": "integer", "minimum": 0 },
@@ -218,6 +229,14 @@
       "required": ["name"],
       "properties": {
         "name": { "type": "string" },
+        "type": {
+          "description": "Series chart type for combo charts",
+          "enum": ["line", "bar", "area"]
+        },
+        "axis": {
+          "description": "Which axis this series uses",
+          "enum": ["left", "right"]
+        },
         "color": { "type": "string" },
         "tooltipFields": {
           "type": "array",
