@@ -84,14 +84,14 @@ options:
 
 ## Status
 
-| Feature                       | Schema | Parser | Emitters |
-|-------------------------------|--------|--------|----------|
-| Parameters + values + affects | yes    | yes    | pending  |
-| Radio control                 | yes    | yes    | pending  |
-| Dynamic titles                | yes    | yes    | pending  |
-| Combo / diverging             | yes    | yes    | pending  |
-| Series colours + tooltips     | yes    | yes    | pending  |
-| Pivot formatting              | yes    | yes    | pending  |
-| LTM aggregation               | yes    | yes    | pending  |
+| Feature                       | Schema | Parser | Metabase emitter |
+|-------------------------------|--------|--------|------------------|
+| Parameters + values + affects | yes    | yes    | partial          |
+| Radio control                 | yes    | yes    | yes (as string/=)|
+| Dynamic titles                | yes    | yes    | yes (titleTemplate)|
+| Combo / diverging             | yes    | yes    | partial          |
+| Series colours + tooltips     | yes    | yes    | colours only     |
+| Pivot formatting              | yes    | yes    | rows/columns only|
+| LTM aggregation               | yes    | yes    | emitted as sum   |
 
-These are additive. Existing specs remain valid. Parser structs now load all of the above; emitters still need to consume them.
+These are additive. Existing specs remain valid. The Metabase emitter now consumes the new fields where the target can express them; other emitters still need the same treatment.
