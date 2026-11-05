@@ -21,11 +21,16 @@ The universal spec is intentionally smaller than any vendor format. Each transpi
 - Raw SQL (or target-native query) compiled into each panel.
 - Temporal grain is the hardest seam — Grafana’s time grouping differs from others.
 
-## ECharts
+## ECharts (implemented)
 
-- One TypeScript `option` object per widget.
-- `markLine` for goal lines.
-- Pure client-side; data is supplied separately.
+- One TypeScript `option` object per widget (`internal/echarts`).
+- `markLine` for goal lines / deviation.
+- Pure client-side; data is left as a placeholder so the caller injects real series.
+- Supported types: line, area, bar, stacked_bar, pie, scatter, number (as gauge).
+
+```bash
+go run ./cmd/uds -in examples/sales-overview.yaml -target echarts -out echarts-out
+```
 
 ## Excalidraw (visual mock)
 
