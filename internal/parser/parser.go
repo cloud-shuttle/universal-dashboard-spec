@@ -76,14 +76,15 @@ type Source struct {
 }
 
 type Parameter struct {
-	Name        string   `yaml:"name"`
-	Title       string   `yaml:"title,omitempty"`
-	Type        string   `yaml:"type"`
-	Values      []string `yaml:"values,omitempty"`
-	Affects     string   `yaml:"affects,omitempty"`
-	Default     any      `yaml:"default,omitempty"`
-	Required    bool     `yaml:"required,omitempty"`
-	Description string   `yaml:"description,omitempty"`
+	Name        string            `yaml:"name"`
+	Title       string            `yaml:"title,omitempty"`
+	Type        string            `yaml:"type"`
+	Values      []string          `yaml:"values,omitempty"`
+	Affects     string            `yaml:"affects,omitempty"`
+	Swaps       map[string]string `yaml:"swaps,omitempty"`
+	Default     any               `yaml:"default,omitempty"`
+	Required    bool              `yaml:"required,omitempty"`
+	Description string            `yaml:"description,omitempty"`
 }
 
 type Measure struct {
@@ -138,6 +139,8 @@ type Widget struct {
 
 type Series struct {
 	Name          string   `yaml:"name"`
+	Type          string   `yaml:"type,omitempty"`
+	Axis          string   `yaml:"axis,omitempty"`
 	Color         string   `yaml:"color,omitempty"`
 	TooltipFields []string `yaml:"tooltipFields,omitempty"`
 }
