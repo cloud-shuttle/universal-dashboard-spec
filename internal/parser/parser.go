@@ -61,6 +61,7 @@ type Metadata struct {
 type Spec struct {
 	Source     *Source     `yaml:"source,omitempty"`
 	Models     []string    `yaml:"models,omitempty"`
+	Parameters []Parameter `yaml:"parameters,omitempty"`
 	Measures   []Measure   `yaml:"measures"`
 	Dimensions []Dimension `yaml:"dimensions"`
 	Filters    []Filter    `yaml:"filters,omitempty"`
@@ -72,6 +73,15 @@ type Source struct {
 	Database string `yaml:"database,omitempty"`
 	Schema   string `yaml:"schema,omitempty"`
 	Table    string `yaml:"table,omitempty"`
+}
+
+type Parameter struct {
+	Name        string `yaml:"name"`
+	Title       string `yaml:"title,omitempty"`
+	Type        string `yaml:"type"`
+	Default     any    `yaml:"default,omitempty"`
+	Required    bool   `yaml:"required,omitempty"`
+	Description string `yaml:"description,omitempty"`
 }
 
 type Measure struct {
@@ -92,10 +102,13 @@ type Dimension struct {
 }
 
 type Filter struct {
-	Name      string `yaml:"name"`
-	Title     string `yaml:"title,omitempty"`
-	Dimension string `yaml:"dimension"`
-	Required  bool   `yaml:"required,omitempty"`
+	Name        string `yaml:"name"`
+	Title       string `yaml:"title,omitempty"`
+	Dimension   string `yaml:"dimension"`
+	Control     string `yaml:"control,omitempty"`
+	Multi       bool   `yaml:"multi,omitempty"`
+	CascadeFrom string `yaml:"cascadeFrom,omitempty"`
+	Required    bool   `yaml:"required,omitempty"`
 }
 
 type Tab struct {
@@ -112,8 +125,16 @@ type Widget struct {
 	Measures   []string       `yaml:"measures,omitempty"`
 	Dimensions []string       `yaml:"dimensions,omitempty"`
 	Filters    []string       `yaml:"filters,omitempty"`
+	Parameters []string       `yaml:"parameters,omitempty"`
+	Actions    []Action       `yaml:"actions,omitempty"`
 	Layout     Layout         `yaml:"layout"`
 	Options    map[string]any `yaml:"options,omitempty"`
+}
+
+type Action struct {
+	Type               string            `yaml:"type"`
+	Target             string            `yaml:"target,omitempty"`
+	ParameterMappings  map[string]string `yaml:"parameterMappings,omitempty"`
 }
 
 type Layout struct {
@@ -132,11 +153,11 @@ type SemanticModel struct {
 }
 
 type SemanticModelSpec struct {
-	Source     *Source    `yaml:"source,omitempty"`
-	Entities   []Entity   `yaml:"entities,omitempty"`
+	Source     *Source     `yaml:"source,omitempty"`
+	Entities   []Entity    `yaml:"entities,omitempty"`
 	Dimensions []Dimension `yaml:"dimensions"`
-	Measures   []Measure  `yaml:"measures"`
-	Metrics    []Metric   `yaml:"metrics,omitempty"`
+	Measures   []Measure   `yaml:"measures"`
+	Metrics    []Metric    `yaml:"metrics,omitempty"`
 }
 
 type Entity struct {
@@ -180,7 +201,7 @@ var preferredTypes = map[string][]string{
 	"deviation":          {"bar", "line"},
 	"distribution":       {"bar", "heatmap"},
 	"correlation":        {"scatter", "heatmap"},
-	"lookup":             {"table", "number"},
+	"lookup":             {"table", "number", "pivot"},
 }
 
 func Load(path string) (*Dashboard, error) {
