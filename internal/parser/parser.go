@@ -1,11 +1,36 @@
 package parser
 
 import (
+	"bytes"
+	"embed"
+	"encoding/json"
 	"fmt"
 	"os"
 
+	"github.com/santhosh-tekuri/jsonschema/v5"
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed schema.json
+var schemaFS embed.FS
+
+var compiledSchema *jsonschema.Schema
+
+func init() {
+	b, err := schemaFS.ReadFile("schema.json")
+	if err != nil {
+		panic(err)
+	}
+	c := jsonschema.NewCompiler()
+	if err := c.AddResource("dashboard.json", bytes.NewReader(b)); err != nil {
+		panic(err)
+	}
+	s, err := c.Compile("dashboard.json")
+	if err != nil {
+		panic(err)
+	}
+	compiledSchema = s
+}
 
 type Dashboard struct {
 	APIVersion string   `yaml:"apiVersion"`
@@ -113,11 +138,65 @@ func Load(path string) (*Dashboard, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Validate against JSON Schema (YAML → generic map → JSON)
+	var raw any
+	if err := yaml.Unmarshal(b, &raw); err != nil {
+		return nil, fmt.Errorf("yaml: %w", err)
+	}
+	// jsonschema expects map[string]any, not map[any]any
+	normalized, err := normalize(raw)
+	if err != nil {
+		return nil, err
+	}
+	jb, err := json.Marshal(normalized)
+	if err != nil {
+		return nil, err
+	}
+	var doc any
+	if err := json.Unmarshal(jb, &doc); err != nil {
+		return nil, err
+	}
+	if err := compiledSchema.Validate(doc); err != nil {
+		return nil, fmt.Errorf("schema: %w", err)
+	}
+
 	var d Dashboard
 	if err := yaml.Unmarshal(b, &d); err != nil {
 		return nil, err
 	}
 	return &d, nil
+}
+
+// normalize converts map[any]any (from yaml) into map[string]any for json.
+func normalize(v any) (any, error) {
+	switch t := v.(type) {
+	case map[any]any:
+		m := make(map[string]any, len(t))
+		for k, val := range t {
+			ks, ok := k.(string)
+			if !ok {
+				return nil, fmt.Errorf("non-string map key %v", k)
+			}
+			nv, err := normalize(val)
+			if err != nil {
+				return nil, err
+			}
+			m[ks] = nv
+		}
+		return m, nil
+	case []any:
+		for i, val := range t {
+			nv, err := normalize(val)
+			if err != nil {
+				return nil, err
+			}
+			t[i] = nv
+		}
+		return t, nil
+	default:
+		return v, nil
+	}
 }
 
 // Validate checks known intents and recommended type pairings.
