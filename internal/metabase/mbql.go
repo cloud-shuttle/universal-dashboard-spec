@@ -1,6 +1,8 @@
 package metabase
 
 import (
+	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -14,6 +16,7 @@ func buildMBQL(w parser.Widget, d *parser.Dashboard, src cardSource, reg *parser
 	for _, mName := range widgetMeasures(w) {
 		m, model := lookupMeasure(d, mName, reg)
 		if m == nil {
+			fmt.Fprintf(os.Stderr, "warning: widget %q: measure %q not found, skipped\n", w.ID, mName)
 			continue
 		}
 		item, fallback := measureAgg(m, d, src, reg, map[string]bool{}, cardGrain(w, d, reg), nil, model)
@@ -192,10 +195,10 @@ func compileExpr(e *parser.Expr, d *parser.Dashboard, src cardSource, reg *parse
 		if model != "" && !strings.Contains(e.Name, ".") {
 			ref = model + "." + e.Name
 		}
-		m := findMeasure(d, ref, reg)
+		m, _ := lookupMeasure(d, ref, reg)
 		owner := model
 		if m == nil && ref != e.Name {
-			m = findMeasure(d, e.Name, reg)
+			m, _ = lookupMeasure(d, e.Name, reg)
 			owner = ""
 		}
 		if m != nil {

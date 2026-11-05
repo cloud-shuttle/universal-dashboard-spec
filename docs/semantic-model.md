@@ -97,7 +97,7 @@ spec:
 
 Qualified names (`model.measure`) are resolved against loaded SemanticModels. Unqualified names still work for inline definitions.
 
-Metabase uses the source table of the model that owns the card's first measure. A dimension from a second model is a left join. The join matches a shared entity name, using the foreign key on the measure model and the primary key on the other model. Both models need that entity. `-models` on a directory loads `kind: SemanticModel` files and skips a dashboard that sits in the same folder.
+Metabase uses the source table of the model that owns the card's first measure. A second model is joined only when a query field needs it (a breakout, pivot field, fixed filter, or measure `where`). One side of the shared entity must be a primary key. A dashboard filter does not add a join, and a filter whose model is not in the query is left unmapped. A model with no source, database, or table is filled from the dashboard source, then `Sample Database` / `PUBLIC` / `ORDERS`, and the emitter warns. `-database` sets the database on the base table and on every join. `-models` on a directory loads `kind: SemanticModel` files and skips a dashboard that sits in the same folder.
 
 ## Compilation targets
 

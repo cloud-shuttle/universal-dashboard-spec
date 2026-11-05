@@ -14,6 +14,7 @@ type cardSource struct {
 	base              string
 	joins             []mbqlJoin
 	joined            map[string]mbqlJoin
+	warnings          []string
 }
 
 type mbqlJoin struct {
@@ -28,7 +29,9 @@ func resolveCardSource(w parser.Widget, d *parser.Dashboard, opts EmitOptions, r
 		base:   base,
 		joined: map[string]mbqlJoin{},
 	}
-	src.db, src.schema, src.table = tableOf(modelByName(reg, base), d, opts, true)
+	var warns []string
+	src.db, src.schema, src.table, warns = tableOf(modelByName(reg, base), d, opts, true)
+	src.warnings = append(src.warnings, warns...)
 	for _, name := range others {
 		other := modelByName(reg, name)
 		if other == nil {
@@ -38,11 +41,12 @@ func resolveCardSource(w parser.Widget, d *parser.Dashboard, opts EmitOptions, r
 		if baseModel == nil {
 			return cardSource{}, fmt.Errorf("dimension from %q needs a join, and the card has no model to join from", name)
 		}
-		left, right, ok := matchEntities(baseModel, other)
-		if !ok {
-			return cardSource{}, fmt.Errorf("cannot join %q to %q: no shared entity", base, name)
+		left, right, err := matchEntities(baseModel, other)
+		if err != nil {
+			return cardSource{}, fmt.Errorf("cannot join %q to %q: %w", base, name, err)
 		}
-		db, schema, table := tableOf(other, d, opts, false)
+		db, schema, table, warns := tableOf(other, d, opts, false)
+		src.warnings = append(src.warnings, warns...)
 		j := mbqlJoin{alias: name, db: db, schema: schema, table: table, left: left, right: right}
 		src.joins = append(src.joins, j)
 		src.joined[name] = j
@@ -86,21 +90,27 @@ func (s cardSource) joinClauses() []any {
 	return out
 }
 
-// tableOf resolves a physical table. CLI overrides apply to the base table only.
-func tableOf(m *parser.SemanticModel, d *parser.Dashboard, opts EmitOptions, base bool) (string, string, string) {
+// tableOf resolves a physical table. -database applies to the base table and to
+// every join. -schema and -table apply to the base table only.
+func tableOf(m *parser.SemanticModel, d *parser.Dashboard, opts EmitOptions, base bool) (string, string, string, []string) {
 	db, schema, table := "", "", ""
-	if m != nil && m.Spec.Source != nil {
+	modelDB, modelTable := "", ""
+	hasSource := m != nil && m.Spec.Source != nil
+	if hasSource {
 		db, schema, table = m.Spec.Source.Database, m.Spec.Source.Schema, m.Spec.Source.Table
+		modelDB, modelTable = db, table
 	}
+	dashDB, dashTable := "", ""
 	if d.Spec.Source != nil {
+		dashDB, dashTable = d.Spec.Source.Database, d.Spec.Source.Table
 		if db == "" {
-			db = d.Spec.Source.Database
+			db = dashDB
 		}
 		if schema == "" {
 			schema = d.Spec.Source.Schema
 		}
 		if table == "" {
-			table = d.Spec.Source.Table
+			table = dashTable
 		}
 	}
 	if db == "" {
@@ -112,10 +122,10 @@ func tableOf(m *parser.SemanticModel, d *parser.Dashboard, opts EmitOptions, bas
 	if table == "" {
 		table = "ORDERS"
 	}
+	if opts.Database != "" {
+		db = opts.Database
+	}
 	if base {
-		if opts.Database != "" {
-			db = opts.Database
-		}
 		if opts.Schema != "" {
 			schema = opts.Schema
 		}
@@ -123,7 +133,23 @@ func tableOf(m *parser.SemanticModel, d *parser.Dashboard, opts EmitOptions, bas
 			table = opts.Table
 		}
 	}
-	return db, schema, table
+	var warnings []string
+	if m != nil {
+		name := m.Metadata.Name
+		switch {
+		case !hasSource:
+			warnings = append(warnings, fmt.Sprintf("model %q has no source; using %s.%s.%s", name, db, schema, table))
+		default:
+			if modelDB == "" && dashDB == "" && opts.Database == "" {
+				warnings = append(warnings, fmt.Sprintf("model %q has no database; using %q", name, db))
+			}
+			cliTable := base && opts.Table != ""
+			if modelTable == "" && dashTable == "" && !cliTable {
+				warnings = append(warnings, fmt.Sprintf("model %q has no table; using %q", name, table))
+			}
+		}
+	}
+	return db, schema, table, warnings
 }
 
 func cardModels(w parser.Widget, d *parser.Dashboard, reg *parser.Registry) (base string, others []string) {
@@ -153,13 +179,6 @@ func cardModels(w parser.Widget, d *parser.Dashboard, reg *parser.Registry) (bas
 	for _, p := range w.FixedFilters {
 		add(p.Dimension)
 	}
-	for _, name := range w.Filters {
-		f := findFilter(d, name)
-		if f == nil {
-			continue
-		}
-		add(filterBindingForWidget(*f, w))
-	}
 	for _, name := range widgetMeasures(w) {
 		m, _ := lookupMeasure(d, name, reg)
 		if m == nil {
@@ -175,29 +194,49 @@ func cardModels(w parser.Widget, d *parser.Dashboard, reg *parser.Registry) (bas
 	return order[0], order[1:]
 }
 
-func matchEntities(base, other *parser.SemanticModel) (left, right string, ok bool) {
+// matchEntities joins on a shared entity only when one side is a primary key.
+// Foreign key on the base and primary key on the other model is preferred.
+// The reverse is accepted. Two foreign keys are refused: customer = customer
+// multiplies every fact row.
+func matchEntities(base, other *parser.SemanticModel) (left, right string, err error) {
 	type ent struct{ typ, field string }
 	otherBy := map[string]ent{}
 	for _, e := range other.Spec.Entities {
 		otherBy[e.Name] = ent{e.Type, e.Field}
 	}
-	var fbL, fbR string
+	var bestL, bestR string
+	bestRank := 0
+	var nonUnique string
 	for _, e := range base.Spec.Entities {
 		o, found := otherBy[e.Name]
 		if !found || e.Field == "" || o.field == "" {
 			continue
 		}
-		if e.Type == "foreign" && o.typ == "primary" {
-			return e.Field, o.field, true
+		rank := 0
+		switch {
+		case e.Type == "foreign" && o.typ == "primary":
+			rank = 3
+		case e.Type == "primary" && o.typ == "foreign":
+			rank = 2
+		case e.Type == "primary" || o.typ == "primary":
+			rank = 1
+		default:
+			if nonUnique == "" {
+				nonUnique = e.Name
+			}
 		}
-		if fbL == "" {
-			fbL, fbR = e.Field, o.field
+		if rank > bestRank {
+			bestRank = rank
+			bestL, bestR = e.Field, o.field
 		}
 	}
-	if fbL != "" {
-		return fbL, fbR, true
+	if bestRank > 0 {
+		return bestL, bestR, nil
 	}
-	return "", "", false
+	if nonUnique != "" {
+		return "", "", fmt.Errorf("shared entity %q is not a primary key", nonUnique)
+	}
+	return "", "", fmt.Errorf("no shared entity")
 }
 
 func modelByName(reg *parser.Registry, name string) *parser.SemanticModel {
@@ -227,8 +266,10 @@ func shortName(name string) string {
 	return name
 }
 
-// lookupMeasure resolves a measure, or a simple/ltm metric, to a measure.
+// lookupMeasure resolves a measure, or a simple, ltm, ratio, or derived metric.
 // A type:ltm metric becomes an ltm aggregation of the measure it names.
+// A ratio is numerator / denominator. A derived metric is its expression.
+// cumulative stays unresolved.
 func lookupMeasure(d *parser.Dashboard, name string, reg *parser.Registry) (*parser.Measure, string) {
 	model, _, _ := splitRef(name)
 	if m := findMeasure(d, name, reg); m != nil {
@@ -244,10 +285,16 @@ func lookupMeasure(d *parser.Dashboard, name string, reg *parser.Registry) (*par
 	local := shortName(name)
 	for i := range sm.Spec.Metrics {
 		met := sm.Spec.Metrics[i]
-		if met.Name != local || met.Measure == "" {
+		if met.Name != local {
 			continue
 		}
-		if met.Type != "ltm" && met.Type != "simple" {
+		switch met.Type {
+		case "ratio":
+			return &parser.Measure{Name: met.Name, Title: met.Title, Expression: met.Numerator + " / " + met.Denominator}, model
+		case "derived":
+			return &parser.Measure{Name: met.Name, Title: met.Title, Expression: met.Expression}, model
+		}
+		if met.Measure == "" || (met.Type != "ltm" && met.Type != "simple") {
 			continue
 		}
 		base := findMeasure(d, model+"."+met.Measure, reg)

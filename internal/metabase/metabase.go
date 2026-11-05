@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/parser"
@@ -18,8 +19,8 @@ type EmitOptions struct {
 
 // Emit produces a map of filename → YAML content suitable for Metabase Representations import.
 // Entity IDs are deterministic (hash of name) so re-runs do not churn.
-// Each card uses the source of its measure model. CLI opts override that base table.
-// A dimension from another model is a left join on a shared entity.
+// Each card uses the source of its measure model. -database overrides the base table and every join. -schema and -table override the base table.
+// A query field from another model is a left join on a shared entity, and one side must be a primary key. A filter binding does not add a join.
 // Intent drives additional visualization and query settings (sort, stacking, goal line).
 // If reg is non-nil, qualified measure/dimension names (model.name) are resolved against it.
 // Filters declared on a widget are wired as field targets on the dashcard.
@@ -37,6 +38,9 @@ func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[stri
 		src, err := resolveCardSource(w, d, opts, reg)
 		if err != nil {
 			return nil, fmt.Errorf("widget %s: %w", w.ID, err)
+		}
+		for _, msg := range src.warnings {
+			fmt.Fprintf(os.Stderr, "warning: %s\n", msg)
 		}
 		sources[w.ID] = src
 		query, err := buildMBQL(w, d, src, reg)
@@ -267,7 +271,12 @@ func buildParameterMappings(d *parser.Dashboard, w parser.Widget, src cardSource
 			continue
 		}
 		binding := filterBindingForWidget(*f, w)
-		model, _, _ := splitRef(binding)
+		model, _, qualified := splitRef(binding)
+		if qualified && model != src.base {
+			if _, ok := src.joined[model]; !ok {
+				continue
+			}
+		}
 		mappings = append(mappings, map[string]any{
 			"parameter_id": stableID("param-" + f.Name),
 			"card_id":      stableID("card-" + w.ID),
@@ -303,7 +312,8 @@ func mapDisplay(t string) string {
 }
 
 // filterBindingForWidget picks the binding whose model matches a measure or
-// dimension on the widget. The model prefix is kept so the field can be joined.
+// dimension on the widget. The model prefix is kept. A binding whose model is
+// not on the card is left unmapped, because a filter does not add a join.
 func filterBindingForWidget(f parser.Filter, w parser.Widget) string {
 	if len(f.Bindings) == 0 {
 		return f.Dimension

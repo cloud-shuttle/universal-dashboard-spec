@@ -5,7 +5,7 @@ The universal spec is intentionally smaller than any vendor format. Each transpi
 ## Metabase Representations
 
 - Cards get stable NanoID entity IDs (from a manifest) so re-runs do not churn.
-- Filters become dashboard parameters. Each dashcard maps the parameter to a field on that card's query, including a joined table when the field comes from another model.
+- Filters become dashboard parameters. Each dashcard maps the parameter to a field on that card's query, including a joined table when the field comes from another model. A filter whose model is not in the query is left unmapped.
 - Goal lines map into visualization_settings.
 - Lossy: Metabase measure entities have patchy serdes coverage, so measures are inlined as aggregations.
 
