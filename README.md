@@ -36,3 +36,12 @@ spec:
 ```
 
 See `schema/dashboard.json` for the full JSON Schema and `examples/` for worked examples.
+
+## Try the CLI
+
+```bash
+go run ./cmd/uds -in examples/sales-overview.yaml -target excalidraw -out out.excalidraw
+go run ./cmd/uds -in examples/sales-overview.yaml -target metabase -out metabase-out
+```
+
+See `transpilers/README.md` for details. The Metabase emitter is minimal (layout + parameters); a full version would emit MBQL and stable NanoIDs.
