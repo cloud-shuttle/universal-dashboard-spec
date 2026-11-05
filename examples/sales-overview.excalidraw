@@ -1,0 +1,63 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "uds-transpiler",
+  "elements": [
+    {
+      "id": "tab-overview",
+      "type": "rectangle",
+      "x": 40, "y": 40, "width": 120, "height": 40,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid",
+      "label": { "text": "Overview" }
+    },
+    {
+      "id": "tab-by-product",
+      "type": "rectangle",
+      "x": 170, "y": 40, "width": 120, "height": 40,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#f8f9fa",
+      "fillStyle": "solid",
+      "label": { "text": "By Product" }
+    },
+    {
+      "id": "filter-date",
+      "type": "rectangle",
+      "x": 40, "y": 100, "width": 140, "height": 32,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid",
+      "label": { "text": "Date Range" }
+    },
+    {
+      "id": "filter-region",
+      "type": "rectangle",
+      "x": 190, "y": 100, "width": 120, "height": 32,
+      "strokeColor": "#1971c2",
+      "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid",
+      "label": { "text": "Region" }
+    },
+    {
+      "id": "widget-revenue-over-time",
+      "type": "rectangle",
+      "x": 40, "y": 160, "width": 520, "height": 280,
+      "strokeColor": "#2f9e44",
+      "backgroundColor": "#ebfbee",
+      "fillStyle": "solid",
+      "label": { "text": "Line\nRevenue over Time" }
+    },
+    {
+      "id": "widget-deals-by-region",
+      "type": "rectangle",
+      "x": 580, "y": 160, "width": 260, "height": 280,
+      "strokeColor": "#e8590c",
+      "backgroundColor": "#fff4e6",
+      "fillStyle": "solid",
+      "label": { "text": "Bar\nDeals by Region" }
+    }
+  ],
+  "appState": { "viewBackgroundColor": "#ffffff" },
+  "files": {}
+}
