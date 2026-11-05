@@ -63,16 +63,23 @@ func Emit(m *parser.SemanticModel) ([]byte, error) {
 			}
 			mm["type"] = "number"
 			mm["sql"] = parser.FormatExpr(ex, func(name string) string { return "{" + name + "}" })
+		} else if meas.Aggregation == "ltm" {
+			mm["sql"] = meas.Field
+			mm["type"] = "sum"
+			mm["rolling_window"] = map[string]any{
+				"trailing": "12 month",
+				"offset":   "end",
+			}
 		} else {
 			mm["sql"] = meas.Field
 			mm["type"] = mapAgg(meas.Aggregation)
-			if len(meas.Where) > 0 {
-				filters := make([]map[string]any, 0, len(meas.Where))
-				for _, p := range meas.Where {
-					filters = append(filters, map[string]any{"sql": predicateSQL(p)})
-				}
-				mm["filters"] = filters
+		}
+		if len(meas.Where) > 0 {
+			filters := make([]map[string]any, 0, len(meas.Where))
+			for _, p := range meas.Where {
+				filters = append(filters, map[string]any{"sql": predicateSQL(p)})
 			}
+			mm["filters"] = filters
 		}
 		if meas.Title != "" {
 			mm["title"] = meas.Title

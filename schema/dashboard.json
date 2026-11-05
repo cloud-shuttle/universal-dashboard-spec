@@ -132,7 +132,7 @@
         "description": { "type": "string" },
         "where": {
           "type": "array",
-          "description": "Row predicates applied before this aggregation.",
+          "description": "Row predicates. On an aggregation they limit the summed rows. On an expression they apply to every measure the expression uses.",
           "items": { "$ref": "#/$defs/predicate" }
         }
       }

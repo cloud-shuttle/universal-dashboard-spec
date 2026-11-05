@@ -84,6 +84,9 @@ func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[stri
 			"model": "Dashboard",
 		}},
 	}
+	if tabs := buildTabs(d); len(tabs) > 0 {
+		dash["tabs"] = tabs
+	}
 
 	b, err := yaml.Marshal(dash)
 	if err != nil {
@@ -134,35 +137,8 @@ func buildVizSettings(w parser.Widget) map[string]any {
 		}
 	}
 
-	// pivot formatting. Structured rows/columns keep measure and dimension order.
-	// Metabase itself puts measures in values, so the mixed order is also stored
-	// on pivot.row_order / pivot.column_order.
-	if w.Type == "pivot" && (len(w.Rows) > 0 || len(w.Columns) > 0) {
-		rowDims, rowOrder := splitPivot(w.Rows)
-		colDims, colOrder := splitPivot(w.Columns)
-		values := []string{}
-		for _, item := range w.Rows {
-			if item.Measure != "" {
-				values = append(values, item.Measure)
-			}
-		}
-		for _, item := range w.Columns {
-			if item.Measure != "" {
-				values = append(values, item.Measure)
-			}
-		}
-		vs["pivot.rows"] = rowDims
-		vs["pivot.columns"] = colDims
-		vs["pivot.values"] = values
-		vs["pivot.row_order"] = rowOrder
-		vs["pivot.column_order"] = colOrder
-	} else if w.Type == "pivot" {
-		if rows, ok := w.Options["rows"]; ok {
-			vs["pivot.rows"] = rows
-		}
-		if cols, ok := w.Options["columns"]; ok {
-			vs["pivot.columns"] = cols
-		}
+	if w.Type == "pivot" {
+		applyPivotSettings(vs, w)
 	}
 
 	return vs
@@ -249,7 +225,7 @@ func buildDashcards(d *parser.Dashboard, cardIDs map[string]string) []map[string
 			if w.Type == "image" {
 				body = w.Src
 			}
-			cards = append(cards, map[string]any{
+			card := map[string]any{
 				"id":      i + 1,
 				"card_id": nil,
 				"row":     w.Layout.Y,
@@ -263,11 +239,15 @@ func buildDashcards(d *parser.Dashboard, cardIDs map[string]string) []map[string
 						"archived": false,
 					},
 				},
-			})
+			}
+			if tabID := dashboardTabID(d, w.Tab); tabID != 0 {
+				card["dashboard_tab_id"] = tabID
+			}
+			cards = append(cards, card)
 			continue
 		}
 		mappings := buildParameterMappings(d, w)
-		cards = append(cards, map[string]any{
+		card := map[string]any{
 			"id":                 i + 1,
 			"card_id":            cardIDs[w.ID],
 			"row":                w.Layout.Y,
@@ -276,7 +256,11 @@ func buildDashcards(d *parser.Dashboard, cardIDs map[string]string) []map[string
 			"size_y":             w.Layout.H,
 			"entity_id":          stableID("dashcard-" + w.ID),
 			"parameter_mappings": mappings,
-		})
+		}
+		if tabID := dashboardTabID(d, w.Tab); tabID != 0 {
+			card["dashboard_tab_id"] = tabID
+		}
+		cards = append(cards, card)
 	}
 	return cards
 }
@@ -329,8 +313,10 @@ func mapDisplay(t string) string {
 		return "bar"
 	case "pie":
 		return "pie"
-	case "table", "pivot":
+	case "table":
 		return "table"
+	case "pivot":
+		return "pivot"
 	case "number":
 		return "scalar"
 	case "combo":
@@ -338,22 +324,6 @@ func mapDisplay(t string) string {
 	default:
 		return "table"
 	}
-}
-
-func splitPivot(items []parser.PivotField) (dims []string, order []map[string]string) {
-	dims = []string{}
-	order = []map[string]string{}
-	for _, item := range items {
-		if item.Dimension != "" {
-			dims = append(dims, item.Dimension)
-			order = append(order, map[string]string{"dimension": item.Dimension})
-			continue
-		}
-		if item.Measure != "" {
-			order = append(order, map[string]string{"measure": item.Measure})
-		}
-	}
-	return dims, order
 }
 
 func bindingDimension(binding string) string {

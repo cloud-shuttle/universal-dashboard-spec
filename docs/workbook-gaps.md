@@ -53,7 +53,7 @@ See [layout.md](layout.md). One row unit ≈ 30px in most targets.
 
 ## LTM
 
-`ltm` is a valid measure aggregation and a valid metric type in both dashboards and semantic models.
+`ltm` is a trailing window of the breakout grain: 12 months, 4 quarters, 52 weeks, or 365 days. A year grain is already one bucket, so it stays a single sum. Metabase emits that window with `offset`. Cube emits a 12-month rolling window, because a semantic measure has no widget grain.
 
 ## Filtered measures
 
@@ -73,11 +73,15 @@ Operators: `eq`, `neq`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`. Use an array v
 
 ## Expression measures
 
-Set `expression` instead of `aggregation`. The vocabulary is measure names, numbers, `+ - * /`, parentheses, and unary minus.
+Set `expression` instead of `aggregation`. The vocabulary is measure names, numbers, `+ - * /`, parentheses, and unary minus. `where` on an expression applies to every measure it uses, so one difference can be filtered without a closing, opening, and difference helper for each movement.
 
 ```yaml
-- name: mrr_change
-  expression: mrr - prev_mrr
+- name: lost_diff
+  expression: closing - opening
+  where:
+    - dimension: movement
+      operator: eq
+      value: Lost
 ```
 
 Semantic metrics of `type: derived` are unchanged. This field is for measures.
@@ -117,7 +121,25 @@ Tabs accept `titleTemplate`, same `{{parameter}}` form as widget titles.
 
 ## Pivot order
 
-`rows` and `columns` are ordered lists. Each entry is `{ dimension: name }` or `{ measure: name }`.
+`rows` and `columns` are ordered lists. Each entry is `{ dimension: name }` or `{ measure: name }`. A measure stays in the bucket where it is listed.
+
+Pivot formatting lives on `options`:
+
+```yaml
+options:
+  boldTotals: true
+  negatives: brackets
+  conditionalColors:
+    - measure: lost_diff
+      when: negative
+      color: "#e8590c"
+```
+
+`when` is `negative` or `positive`. Each dimension in `columns` is one grouped-header level. Metabase records `negative_in_parentheses` on each measure. Its number formatter still prints a leading minus.
+
+## Still under x- keys
+
+Query structure is in the schema. These presentation and interaction details are not, so they stay on `x-` keys: tooltip fields beyond `series.tooltipFields`, selected-cell highlighting, charts that stay empty until a click, footer and extra rows, the percent-of-total line, and project notes. Count colours that are a positive or negative rule can use `options.conditionalColors`.
 
 ## Status
 
@@ -128,8 +150,8 @@ Tabs accept `titleTemplate`, same `{{parameter}}` form as widget titles.
 | Dynamic titles                | yes    | yes    | yes              |
 | Combo series type/axis        | yes    | yes    | partial          |
 | Series colours                | yes    | yes    | yes              |
-| Pivot formatting              | yes    | yes    | rows/columns only|
-| LTM (dashboard + semantic)    | yes    | yes    | emitted as sum   |
+| Pivot formatting              | yes    | yes    | column split, totals, colours; brackets recorded |
+| LTM (dashboard + semantic)    | yes    | yes    | trailing window via `offset` |
 | Layout units documented       | yes    | —      | —                |
 | Measure `where`               | yes    | yes    | `sum-where` / `count-where` / `distinct-where` |
 | Measure `expression`          | yes    | yes    | MBQL `+ - * /`   |
@@ -137,9 +159,9 @@ Tabs accept `titleTemplate`, same `{{parameter}}` form as widget titles.
 | Filter `bindings`             | yes    | yes    | one parameter, per-card mapping |
 | Filter `searchable`           | yes    | yes    | passed on the parameter |
 | Widget `timeGrain`            | yes    | yes    | `temporal-unit`  |
-| Tab `titleTemplate`           | yes    | yes    | not emitted (no tabs yet) |
+| Tab `titleTemplate`           | yes    | yes    | tab name, `{{param}}` from the parameter default |
 | `text` / `image` widgets      | yes    | yes    | virtual text card |
 | Widget `fixedFilters`         | yes    | yes    | query `filter`   |
-| Pivot `rows` / `columns`      | yes    | yes    | row order stored; measures go to values |
+| Pivot `rows` / `columns`      | yes    | yes    | measures stay in the listed bucket |
 
 These are additive. Existing specs remain valid.

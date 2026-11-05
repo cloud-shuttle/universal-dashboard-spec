@@ -37,6 +37,14 @@ spec:
       title: MRR Change
       expression: mrr - prev_mrr
       format: currency
+    - name: lost_change
+      title: Lost Change
+      expression: mrr - prev_mrr
+      format: currency
+      where:
+        - dimension: customer_status
+          operator: eq
+          value: Lost Customer
 
   dimensions:
     - name: month
@@ -105,7 +113,15 @@ spec:
         - measure: lost_mrr
         - measure: mrr_change
       columns:
+        - dimension: movement
         - dimension: product
+      options:
+        boldTotals: true
+        negatives: brackets
+        conditionalColors:
+          - measure: mrr_change
+            when: negative
+            color: "#e8590c"
       layout: { x: 0, y: 8, w: 16, h: 8 }
 
     - id: note
