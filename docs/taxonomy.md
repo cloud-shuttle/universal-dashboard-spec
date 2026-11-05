@@ -25,6 +25,7 @@ Optional future extensions (not yet in the schema enum): `flow` (Sankey/funnel),
 
 The CLI and parser run a lightweight check on load:
 
+- JSON Schema validation (embedded `schema.json`) runs first — missing required fields and bad enums fail hard.
 - Unknown `intent` values are **errors** (hard fail).
 - A known intent paired with a non-preferred `type` produces a **warning** on stderr. Compilation still succeeds so existing specs remain valid.
 - Missing intent is always fine (optional in v1).
@@ -58,7 +59,11 @@ Colour remains driven by chart type so the layout is still instantly scannable.
 
 ## Target notes (lossiness)
 
-- **Metabase / Lightdash / Grafana**: Most intents map cleanly. Ranking requires the target to honour sort order. Deviation needs a goal/reference line setting. Pie charts for part-to-whole are lossy for precise comparison on every target.
+- **Metabase**:
+  - `ranking` → `order-by` descending on the first aggregation.
+  - `part_to_whole` (or `stacked_bar`) → `graph.stacking: stacked`.
+  - `deviation` / `options.goalLine` → `graph.goal_value`.
+- **Lightdash / Grafana**: Most intents map cleanly. Ranking requires the target to honour sort order. Pie charts for part-to-whole are lossy for precise comparison on every target.
 - **ECharts**: Full control; markLine for deviation, sorting is client-side.
 - **Excalidraw**: Intent appears in the widget label. Colour is still by chart type.
 

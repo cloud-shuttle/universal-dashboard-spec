@@ -21,6 +21,7 @@ type EmitOptions struct {
 // Emit produces a map of filename → YAML content suitable for Metabase Representations import.
 // Entity IDs are deterministic (hash of name) so re-runs do not churn.
 // Source table is taken from the UDS spec.source block, then overridden by opts if non-empty.
+// Intent drives additional visualization and query settings (sort, stacking, goal line).
 func Emit(d *parser.Dashboard, opts EmitOptions) (map[string][]byte, error) {
 	files := map[string][]byte{}
 
@@ -112,14 +113,23 @@ func buildMBQL(w parser.Widget, d *parser.Dashboard, db, schema, table string) m
 		breakout = append(breakout, ref)
 	}
 
+	query := map[string]any{
+		"source-table": []any{db, schema, table},
+		"aggregation":  agg,
+		"breakout":     breakout,
+	}
+
+	// ranking → order by first measure descending
+	if w.Intent == "ranking" && len(agg) > 0 {
+		query["order-by"] = []any{
+			[]any{"desc", []any{"aggregation", 0}},
+		}
+	}
+
 	return map[string]any{
 		"database": db,
 		"type":     "query",
-		"query": map[string]any{
-			"source-table": []any{db, schema, table},
-			"aggregation":  agg,
-			"breakout":     breakout,
-		},
+		"query":    query,
 	}
 }
 
@@ -129,9 +139,17 @@ func fieldRef(db, schema, table, field string) []any {
 
 func buildVizSettings(w parser.Widget) map[string]any {
 	vs := map[string]any{}
+
+	// deviation / goal line
 	if goal, ok := w.Options["goalLine"]; ok {
 		vs["graph.goal_value"] = goal
 	}
+
+	// part_to_whole → stacked
+	if w.Intent == "part_to_whole" || w.Type == "stacked_bar" {
+		vs["graph.stacking"] = "stacked"
+	}
+
 	if len(w.Dimensions) > 0 {
 		vs["graph.dimensions"] = w.Dimensions
 	}
