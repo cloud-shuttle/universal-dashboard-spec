@@ -97,6 +97,8 @@ spec:
 
 Qualified names (`model.measure`) are resolved against loaded SemanticModels. Unqualified names still work for inline definitions.
 
+Metabase uses the source table of the model that owns the card's first measure. A dimension from a second model is a left join. The join matches a shared entity name, using the foreign key on the measure model and the primary key on the other model. Both models need that entity. `-models` on a directory loads `kind: SemanticModel` files and skips a dashboard that sits in the same folder.
+
 ## Compilation targets
 
 The SemanticModel is designed to transpile cleanly to:

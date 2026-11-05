@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/parser"
 )
 
@@ -20,32 +18,37 @@ type EmitOptions struct {
 
 // Emit produces a map of filename → YAML content suitable for Metabase Representations import.
 // Entity IDs are deterministic (hash of name) so re-runs do not churn.
-// Source table is taken from the UDS spec.source block, then overridden by opts if non-empty.
+// Each card uses the source of its measure model. CLI opts override that base table.
+// A dimension from another model is a left join on a shared entity.
 // Intent drives additional visualization and query settings (sort, stacking, goal line).
 // If reg is non-nil, qualified measure/dimension names (model.name) are resolved against it.
-// Filters and parameters declared on a widget are wired as parameter_mappings on the dashcard.
-// titleTemplate, series colours, and radio controls are emitted where Metabase can express them.
+// Filters declared on a widget are wired as field targets on the dashcard.
+// titleTemplate is substituted from parameter defaults. Series colours and radio controls are emitted where Metabase can express them.
 func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[string][]byte, error) {
 	files := map[string][]byte{}
 
-	db, schema, table := d.SourceOrDefault(
-		defaultIfEmpty(opts.Database, "Sample Database"),
-		defaultIfEmpty(opts.Schema, "PUBLIC"),
-		defaultIfEmpty(opts.Table, "ORDERS"),
-	)
-
 	cardIDs := map[string]string{} // widget ID → entity ID
+	sources := map[string]cardSource{}
 
 	for _, w := range d.Spec.Widgets {
 		if w.Type == "text" || w.Type == "image" {
 			continue
+		}
+		src, err := resolveCardSource(w, d, opts, reg)
+		if err != nil {
+			return nil, fmt.Errorf("widget %s: %w", w.ID, err)
+		}
+		sources[w.ID] = src
+		query, err := buildMBQL(w, d, src, reg)
+		if err != nil {
+			return nil, fmt.Errorf("widget %s: %w", w.ID, err)
 		}
 		eid := stableID("card-" + w.ID)
 		cardIDs[w.ID] = eid
 
 		title := w.Title
 		if w.TitleTemplate != "" {
-			title = w.TitleTemplate // Metabase will resolve {{param}} if the param is present
+			title = resolveTitle(w.TitleTemplate, d.Spec.Parameters)
 		}
 
 		card := map[string]any{
@@ -54,20 +57,20 @@ func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[stri
 			"display":                mapDisplay(w.Type),
 			"type":                   "question",
 			"query_type":             "query",
-			"dataset_query":          buildMBQL(w, d, db, schema, table, reg),
-			"visualization_settings": buildVizSettings(w),
+			"dataset_query":          query,
+			"visualization_settings": buildVizSettings(w, d, reg),
 			"serdes/meta": []map[string]string{{
 				"id":    eid,
-				"label": slug(w.Title),
+				"label": slug(title),
 				"model": "Card",
 			}},
 		}
 
-		b, err := yaml.Marshal(card)
+		b, err := marshalDoc(card)
 		if err != nil {
 			return nil, err
 		}
-		files[fmt.Sprintf("collections/main/cards/%s_%s.yaml", eid, slug(w.Title))] = b
+		files[fmt.Sprintf("collections/main/cards/%s_%s.yaml", eid, slug(title))] = b
 	}
 
 	// Dashboard
@@ -77,7 +80,7 @@ func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[stri
 		"description": d.Metadata.Description,
 		"entity_id":   dashID,
 		"parameters":  buildParameters(d),
-		"dashcards":   buildDashcards(d, cardIDs),
+		"dashcards":   buildDashcards(d, cardIDs, sources, reg),
 		"serdes/meta": []map[string]string{{
 			"id":    dashID,
 			"label": slug(d.Metadata.Title),
@@ -88,7 +91,7 @@ func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[stri
 		dash["tabs"] = tabs
 	}
 
-	b, err := yaml.Marshal(dash)
+	b, err := marshalDoc(dash)
 	if err != nil {
 		return nil, err
 	}
@@ -97,14 +100,7 @@ func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[stri
 	return files, nil
 }
 
-func defaultIfEmpty(v, def string) string {
-	if v == "" {
-		return def
-	}
-	return v
-}
-
-func buildVizSettings(w parser.Widget) map[string]any {
+func buildVizSettings(w parser.Widget, d *parser.Dashboard, reg *parser.Registry) map[string]any {
 	vs := map[string]any{}
 
 	// deviation / goal line
@@ -117,11 +113,11 @@ func buildVizSettings(w parser.Widget) map[string]any {
 		vs["graph.stacking"] = "stacked"
 	}
 
-	if len(w.Dimensions) > 0 {
-		vs["graph.dimensions"] = w.Dimensions
+	if dims := resultNames(w.Dimensions, true, d, reg); len(dims) > 0 {
+		vs["graph.dimensions"] = dims
 	}
-	if len(w.Measures) > 0 {
-		vs["graph.metrics"] = w.Measures
+	if metrics := resultNames(w.Measures, false, d, reg); len(metrics) > 0 {
+		vs["graph.metrics"] = metrics
 	}
 
 	// series colours
@@ -138,7 +134,7 @@ func buildVizSettings(w parser.Widget) map[string]any {
 	}
 
 	if w.Type == "pivot" {
-		applyPivotSettings(vs, w)
+		applyPivotSettings(vs, w, d, reg)
 	}
 
 	return vs
@@ -147,18 +143,13 @@ func buildVizSettings(w parser.Widget) map[string]any {
 func buildParameters(d *parser.Dashboard) []map[string]any {
 	var params []map[string]any
 
-	// Filters become dashboard parameters
+	// Filters become dashboard parameters. The field target lives on each dashcard.
 	for _, f := range d.Spec.Filters {
-		targetDim := f.Dimension
-		if targetDim == "" && len(f.Bindings) > 0 {
-			targetDim = bindingDimension(f.Bindings[0])
-		}
 		p := map[string]any{
-			"id":     stableID("param-" + f.Name),
-			"name":   f.Title,
-			"slug":   f.Name,
-			"type":   mapFilterType(f.Control),
-			"target": []any{"dimension", []any{"template-tag", targetDim}},
+			"id":   stableID("param-" + f.Name),
+			"name": f.Title,
+			"slug": f.Name,
+			"type": mapFilterType(f.Control),
 		}
 		if len(f.Values) > 0 {
 			p["values_source_type"] = "static-list"
@@ -217,7 +208,7 @@ func mapParamType(t string) string {
 	}
 }
 
-func buildDashcards(d *parser.Dashboard, cardIDs map[string]string) []map[string]any {
+func buildDashcards(d *parser.Dashboard, cardIDs map[string]string, sources map[string]cardSource, reg *parser.Registry) []map[string]any {
 	var cards []map[string]any
 	for i, w := range d.Spec.Widgets {
 		if w.Type == "text" || w.Type == "image" {
@@ -246,7 +237,7 @@ func buildDashcards(d *parser.Dashboard, cardIDs map[string]string) []map[string
 			cards = append(cards, card)
 			continue
 		}
-		mappings := buildParameterMappings(d, w)
+		mappings := buildParameterMappings(d, w, sources[w.ID], reg)
 		card := map[string]any{
 			"id":                 i + 1,
 			"card_id":            cardIDs[w.ID],
@@ -265,39 +256,24 @@ func buildDashcards(d *parser.Dashboard, cardIDs map[string]string) []map[string
 	return cards
 }
 
-// buildParameterMappings wires each filter and parameter listed on the widget
-// to the corresponding dashboard parameter.
-func buildParameterMappings(d *parser.Dashboard, w parser.Widget) []map[string]any {
+// buildParameterMappings wires each filter on the widget to a field on the card.
+// Widget parameters only substitute title templates. An MBQL card has no template tags.
+func buildParameterMappings(d *parser.Dashboard, w parser.Widget, src cardSource, reg *parser.Registry) []map[string]any {
 	var mappings []map[string]any
 
 	for _, filterName := range w.Filters {
-		var f *parser.Filter
-		for i := range d.Spec.Filters {
-			if d.Spec.Filters[i].Name == filterName {
-				f = &d.Spec.Filters[i]
-				break
-			}
-		}
+		f := findFilter(d, filterName)
 		if f == nil {
 			continue
 		}
+		binding := filterBindingForWidget(*f, w)
+		model, _, _ := splitRef(binding)
 		mappings = append(mappings, map[string]any{
 			"parameter_id": stableID("param-" + f.Name),
 			"card_id":      stableID("card-" + w.ID),
 			"target": []any{
 				"dimension",
-				[]any{"template-tag", filterDimensionForWidget(*f, w)},
-			},
-		})
-	}
-
-	for _, paramName := range w.Parameters {
-		mappings = append(mappings, map[string]any{
-			"parameter_id": stableID("param-" + paramName),
-			"card_id":      stableID("card-" + w.ID),
-			"target": []any{
-				"variable",
-				[]any{"template-tag", paramName},
+				src.field(model, columnName(d, reg, binding, true), nil),
 			},
 		})
 	}
@@ -326,46 +302,55 @@ func mapDisplay(t string) string {
 	}
 }
 
-func bindingDimension(binding string) string {
-	if i := strings.LastIndex(binding, "."); i >= 0 {
-		return binding[i+1:]
-	}
-	return binding
-}
-
-// filterDimensionForWidget picks the binding whose model matches a measure or
-// dimension on the widget. A single dimension binding is returned as-is.
-func filterDimensionForWidget(f parser.Filter, w parser.Widget) string {
+// filterBindingForWidget picks the binding whose model matches a measure or
+// dimension on the widget. The model prefix is kept so the field can be joined.
+func filterBindingForWidget(f parser.Filter, w parser.Widget) string {
 	if len(f.Bindings) == 0 {
 		return f.Dimension
 	}
 	models := map[string]bool{}
-	for _, n := range w.Measures {
-		if i := strings.IndexByte(n, '.'); i > 0 {
-			models[n[:i]] = true
-		}
-	}
-	for _, n := range w.Dimensions {
-		if i := strings.IndexByte(n, '.'); i > 0 {
-			models[n[:i]] = true
+	for _, n := range append(append([]string{}, w.Measures...), w.Dimensions...) {
+		if model, _, ok := splitRef(n); ok {
+			models[model] = true
 		}
 	}
 	var plain string
 	for _, b := range f.Bindings {
-		if i := strings.IndexByte(b, '.'); i > 0 {
-			if models[b[:i]] {
-				return b[i+1:]
+		model, _, ok := splitRef(b)
+		if !ok {
+			if plain == "" {
+				plain = b
 			}
 			continue
 		}
-		if plain == "" {
-			plain = b
+		if models[model] {
+			return b
 		}
 	}
 	if plain != "" {
 		return plain
 	}
-	return bindingDimension(f.Bindings[0])
+	return f.Bindings[0]
+}
+
+func findFilter(d *parser.Dashboard, name string) *parser.Filter {
+	for i := range d.Spec.Filters {
+		if d.Spec.Filters[i].Name == name {
+			return &d.Spec.Filters[i]
+		}
+	}
+	return nil
+}
+
+func resultNames(names []string, dim bool, d *parser.Dashboard, reg *parser.Registry) []string {
+	if len(names) == 0 {
+		return nil
+	}
+	out := make([]string, len(names))
+	for i, name := range names {
+		out[i] = columnName(d, reg, name, dim)
+	}
+	return out
 }
 
 func findMeasure(d *parser.Dashboard, name string, reg *parser.Registry) *parser.Measure {

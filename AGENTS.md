@@ -18,7 +18,7 @@ You are writing a Universal Dashboard Specification (UDS) YAML file.
 
 3. **Layout** uses a 24-column grid: `layout: { x, y, w, h }`.
 
-4. **Source** (optional but recommended for Metabase):
+4. **Source** (optional but recommended for Metabase). A card that references a SemanticModel uses that model's `source`. A dimension from a second model is a left join on a shared entity name. Inline cards use the dashboard `source`:
    ```yaml
    spec:
      source:

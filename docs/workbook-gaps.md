@@ -109,7 +109,7 @@ A filter sets `dimension` or `bindings`. Bindings are dimension names or `model.
 
 ## Tab title templates
 
-Tabs accept `titleTemplate`, same `{{parameter}}` form as widget titles.
+Tabs and widgets accept `titleTemplate`, same `{{parameter}}` form. Metabase substitutes the parameter default into the tab name and the card name.
 
 ## Static widgets
 
@@ -159,7 +159,7 @@ Query structure is in the schema. These presentation and interaction details are
 | Filter `bindings`             | yes    | yes    | one parameter, per-card mapping |
 | Filter `searchable`           | yes    | yes    | passed on the parameter |
 | Widget `timeGrain`            | yes    | yes    | `temporal-unit`  |
-| Tab `titleTemplate`           | yes    | yes    | tab name, `{{param}}` from the parameter default |
+| Tab `titleTemplate`           | yes    | yes    | tab and card name, `{{param}}` from the parameter default |
 | `text` / `image` widgets      | yes    | yes    | virtual text card |
 | Widget `fixedFilters`         | yes    | yes    | query `filter`   |
 | Pivot `rows` / `columns`      | yes    | yes    | measures stay in the listed bucket |

@@ -10,7 +10,8 @@
 | Measure `where`      | `*-where` agg     | query filter  | SQL `WHERE`    | external    | not shown  |
 | Measure expression   | MBQL arithmetic   | SQL expr      | SQL expr       | external    | not shown  |
 | Widget `timeGrain`   | `temporal-unit`   | timeInterval  | interval       | axis name   | label      |
-| Tab `titleTemplate`  | tab name, default substituted | title | title   | n/a         | label      |
+| Tab `titleTemplate`  | tab and card name, default substituted | title | title   | n/a         | label      |
+| Model source         | model table, join on shared entity | query filter | SQL join | external | not shown |
 | LTM                  | `offset` window   | rolling window| SQL window     | external    | not shown  |
 | `text` / `image`     | virtual text card | markdown tile | text panel     | const       | rectangle  |
 | Pivot row mix        | column split; measures stay listed | lossy | lossy | n/a | not shown |

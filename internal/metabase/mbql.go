@@ -7,16 +7,20 @@ import (
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/parser"
 )
 
-func buildMBQL(w parser.Widget, d *parser.Dashboard, db, schema, table string, reg *parser.Registry) map[string]any {
+func buildMBQL(w parser.Widget, d *parser.Dashboard, src cardSource, reg *parser.Registry) (map[string]any, error) {
 	agg := []any{}
 	var whereFallback []parser.Predicate
+	var fallbackModel string
 	for _, mName := range widgetMeasures(w) {
-		m := findMeasure(d, mName, reg)
+		m, model := lookupMeasure(d, mName, reg)
 		if m == nil {
 			continue
 		}
-		item, fallback := measureAgg(m, d, db, schema, table, reg, map[string]bool{}, cardGrain(w, d, reg), nil)
+		item, fallback := measureAgg(m, d, src, reg, map[string]bool{}, cardGrain(w, d, reg), nil, model)
 		agg = append(agg, item)
+		if len(fallback) > 0 && fallbackModel == "" {
+			fallbackModel = model
+		}
 		whereFallback = append(whereFallback, fallback...)
 	}
 
@@ -31,7 +35,7 @@ func buildMBQL(w parser.Widget, d *parser.Dashboard, db, schema, table string, r
 			return
 		}
 		seenDim[dimName] = true
-		field := dimName
+		model, field, _ := splitRef(dimName)
 		var grain string
 		if dim != nil {
 			if dim.Field != "" {
@@ -42,11 +46,11 @@ func buildMBQL(w parser.Widget, d *parser.Dashboard, db, schema, table string, r
 				grain = w.TimeGrain
 			}
 		}
-		ref := fieldRef(db, schema, table, field)
+		var extra map[string]any
 		if grain != "" {
-			ref = []any{"field", ref[1], map[string]any{"temporal-unit": grain}}
+			extra = map[string]any{"temporal-unit": grain}
 		}
-		breakout = append(breakout, ref)
+		breakout = append(breakout, src.field(model, field, extra))
 	}
 	for _, dimName := range w.Dimensions {
 		addDim(dimName, false)
@@ -59,18 +63,21 @@ func buildMBQL(w parser.Widget, d *parser.Dashboard, db, schema, table string, r
 	}
 
 	query := map[string]any{
-		"source-table": []any{db, schema, table},
+		"source-table": []any{src.db, src.schema, src.table},
 		"aggregation":  agg,
 		"breakout":     breakout,
+	}
+	if joins := src.joinClauses(); len(joins) > 0 {
+		query["joins"] = joins
 	}
 
 	var filters []any
 	// ponytail: avg/min/max have no MBQL *-where; apply the predicate on the query only for a one-measure card.
 	if len(widgetMeasures(w)) == 1 && len(whereFallback) > 0 {
-		filters = append(filters, predicatesMBQL(whereFallback, d, db, schema, table, reg))
+		filters = append(filters, predicatesMBQL(whereFallback, d, src, reg, fallbackModel))
 	}
 	if len(w.FixedFilters) > 0 {
-		filters = append(filters, predicatesMBQL(w.FixedFilters, d, db, schema, table, reg))
+		filters = append(filters, predicatesMBQL(w.FixedFilters, d, src, reg, src.base))
 	}
 	if len(filters) == 1 {
 		query["filter"] = filters[0]
@@ -86,10 +93,10 @@ func buildMBQL(w parser.Widget, d *parser.Dashboard, db, schema, table string, r
 	}
 
 	return map[string]any{
-		"database": db,
+		"database": src.db,
 		"type":     "query",
 		"query":    query,
-	}
+	}, nil
 }
 
 func temporalDim(dim *parser.Dimension, dimCount int) bool {
@@ -108,19 +115,19 @@ func temporalDim(dim *parser.Dimension, dimCount int) bool {
 // inherit is the where from an expression that uses this measure. It is not
 // written back onto the measure, so the same closing measure can stay
 // unfiltered on one card and be filtered inside lost_diff.
-func measureAgg(m *parser.Measure, d *parser.Dashboard, db, schema, table string, reg *parser.Registry, visiting map[string]bool, grain string, inherit []parser.Predicate) (any, []parser.Predicate) {
+func measureAgg(m *parser.Measure, d *parser.Dashboard, src cardSource, reg *parser.Registry, visiting map[string]bool, grain string, inherit []parser.Predicate, model string) (any, []parser.Predicate) {
 	wheres := append(append([]parser.Predicate{}, inherit...), m.Where...)
 	if m.Expression != "" {
 		if visiting[m.Name] {
-			return []any{"sum", fieldRef(db, schema, table, m.Name)}, nil
+			return []any{"sum", src.field(model, m.Name, nil)}, nil
 		}
 		visiting[m.Name] = true
 		ex, err := parser.ParseExpression(m.Expression)
 		if err != nil {
 			delete(visiting, m.Name)
-			return []any{"sum", fieldRef(db, schema, table, m.Name)}, nil
+			return []any{"sum", src.field(model, m.Name, nil)}, nil
 		}
-		item := compileExpr(ex, d, db, schema, table, reg, visiting, grain, wheres)
+		item := nameAgg(m.Name, compileExpr(ex, d, src, reg, visiting, grain, wheres, model))
 		delete(visiting, m.Name)
 		return item, nil
 	}
@@ -132,14 +139,14 @@ func measureAgg(m *parser.Measure, d *parser.Dashboard, db, schema, table string
 	if fieldName == "" {
 		fieldName = m.Name
 	}
-	field := fieldRef(db, schema, table, fieldName)
+	field := src.field(model, fieldName, nil)
 	if aggName == "ltm" {
-		return ltmAgg(m.Name, field, wheres, grain, d, db, schema, table, reg), nil
+		return ltmAgg(m.Name, field, wheres, grain, d, src, reg, model), nil
 	}
 	if len(wheres) == 0 {
 		return []any{aggName, named(m.Name), field}, nil
 	}
-	clause := predicatesMBQL(wheres, d, db, schema, table, reg)
+	clause := predicatesMBQL(wheres, d, src, reg, model)
 	switch aggName {
 	case "sum":
 		return []any{"sum-where", named(m.Name), field, clause}, nil
@@ -160,18 +167,49 @@ func named(name string) map[string]any {
 	return map[string]any{"name": name}
 }
 
-func compileExpr(e *parser.Expr, d *parser.Dashboard, db, schema, table string, reg *parser.Registry, visiting map[string]bool, grain string, inherit []parser.Predicate) any {
-	switch {
-	case e.Name != "":
-		if m := findMeasure(d, e.Name, reg); m != nil {
-			item, _ := measureAgg(m, d, db, schema, table, reg, visiting, grain, inherit)
+// nameAgg attaches the measure name to an expression aggregation so the result
+// column matches graph.metrics. Aggregations that already carry a name are left as they are.
+func nameAgg(name string, item any) any {
+	parts, ok := item.([]any)
+	if !ok || name == "" || len(parts) == 0 {
+		return item
+	}
+	if len(parts) > 1 {
+		if _, ok := parts[1].(map[string]any); ok {
 			return item
 		}
-		field := fieldRef(db, schema, table, e.Name)
+	}
+	out := make([]any, 0, len(parts)+1)
+	out = append(out, parts[0], named(name))
+	out = append(out, parts[1:]...)
+	return out
+}
+
+func compileExpr(e *parser.Expr, d *parser.Dashboard, src cardSource, reg *parser.Registry, visiting map[string]bool, grain string, inherit []parser.Predicate, model string) any {
+	switch {
+	case e.Name != "":
+		ref := e.Name
+		if model != "" && !strings.Contains(e.Name, ".") {
+			ref = model + "." + e.Name
+		}
+		m := findMeasure(d, ref, reg)
+		owner := model
+		if m == nil && ref != e.Name {
+			m = findMeasure(d, e.Name, reg)
+			owner = ""
+		}
+		if m != nil {
+			if om, _, ok := splitRef(ref); ok && owner == model {
+				owner = om
+			}
+			item, _ := measureAgg(m, d, src, reg, visiting, grain, inherit, owner)
+			return item
+		}
+		field := src.field(model, e.Name, nil)
 		if len(inherit) == 0 {
 			return []any{"sum", named(e.Name), field}
 		}
-		return []any{"sum-where", named(e.Name), field, predicatesMBQL(inherit, d, db, schema, table, reg)}
+		return []any{"sum-where", named(e.Name), field, predicatesMBQL(inherit, d, src, reg, model)}
 	case e.Num != "":
 		if i, err := strconv.Atoi(e.Num); err == nil {
 			return i
@@ -181,12 +219,12 @@ func compileExpr(e *parser.Expr, d *parser.Dashboard, db, schema, table string, 
 		}
 		return e.Num
 	case e.Op == "neg":
-		return []any{"-", compileExpr(e.Left, d, db, schema, table, reg, visiting, grain, inherit)}
+		return []any{"-", compileExpr(e.Left, d, src, reg, visiting, grain, inherit, model)}
 	default:
 		return []any{
 			e.Op,
-			compileExpr(e.Left, d, db, schema, table, reg, visiting, grain, inherit),
-			compileExpr(e.Right, d, db, schema, table, reg, visiting, grain, inherit),
+			compileExpr(e.Left, d, src, reg, visiting, grain, inherit, model),
+			compileExpr(e.Right, d, src, reg, visiting, grain, inherit, model),
 		}
 	}
 }
@@ -194,10 +232,10 @@ func compileExpr(e *parser.Expr, d *parser.Dashboard, db, schema, table string, 
 // ltmAgg is a trailing window of the breakout grain that adds up to twelve
 // months: 12 months, 4 quarters, 52 weeks, or 365 days. A yearly breakout is
 // already one bucket, so it stays a single sum.
-func ltmAgg(name string, field any, wheres []parser.Predicate, grain string, d *parser.Dashboard, db, schema, table string, reg *parser.Registry) any {
+func ltmAgg(name string, field any, wheres []parser.Predicate, grain string, d *parser.Dashboard, src cardSource, reg *parser.Registry, model string) any {
 	base := []any{"sum", field}
 	if len(wheres) > 0 {
-		base = []any{"sum-where", field, predicatesMBQL(wheres, d, db, schema, table, reg)}
+		base = []any{"sum-where", field, predicatesMBQL(wheres, d, src, reg, model)}
 	}
 	periods := ltmPeriods(grain)
 	if periods == 1 {
@@ -238,10 +276,25 @@ func cardGrain(w parser.Widget, d *parser.Dashboard, reg *parser.Registry) strin
 	return "month"
 }
 
-func predicatesMBQL(ps []parser.Predicate, d *parser.Dashboard, db, schema, table string, reg *parser.Registry) any {
+func predicatesMBQL(ps []parser.Predicate, d *parser.Dashboard, src cardSource, reg *parser.Registry, owner string) any {
 	parts := make([]any, 0, len(ps))
 	for _, p := range ps {
-		ref := fieldRef(db, schema, table, predicateField(p.Dimension, d, reg))
+		model, local, qualified := splitRef(p.Dimension)
+		if !qualified {
+			model = owner
+			local = p.Dimension
+		}
+		lookup := p.Dimension
+		if model != "" && !qualified {
+			lookup = model + "." + local
+		}
+		field := local
+		if dim := findDimension(d, lookup, reg); dim != nil && dim.Field != "" {
+			field = dim.Field
+		} else if dim := findDimension(d, p.Dimension, reg); dim != nil && dim.Field != "" {
+			field = dim.Field
+		}
+		ref := src.field(model, field, nil)
 		var clause any
 		switch p.Operator {
 		case "neq":
@@ -278,18 +331,4 @@ func predicatesMBQL(ps []parser.Predicate, d *parser.Dashboard, db, schema, tabl
 		return parts[0]
 	}
 	return append([]any{"and"}, parts...)
-}
-
-func predicateField(name string, d *parser.Dashboard, reg *parser.Registry) string {
-	if dim := findDimension(d, name, reg); dim != nil && dim.Field != "" {
-		return dim.Field
-	}
-	if i := strings.LastIndex(name, "."); i >= 0 {
-		return name[i+1:]
-	}
-	return name
-}
-
-func fieldRef(db, schema, table, field string) []any {
-	return []any{"field", []any{db, schema, table, field}, nil}
 }

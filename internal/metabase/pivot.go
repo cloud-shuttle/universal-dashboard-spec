@@ -7,8 +7,8 @@ import (
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/parser"
 )
 
-func applyPivotSettings(vs map[string]any, w parser.Widget) {
-	split := pivotColumnSplit(w)
+func applyPivotSettings(vs map[string]any, w parser.Widget, d *parser.Dashboard, reg *parser.Registry) {
+	split := pivotColumnSplit(w, d, reg)
 	vs["pivot_table.column_split"] = split
 
 	if w.Options == nil {
@@ -57,14 +57,14 @@ func applyPivotSettings(vs map[string]any, w parser.Widget) {
 	}
 }
 
-func pivotColumnSplit(w parser.Widget) map[string]any {
+func pivotColumnSplit(w parser.Widget, d *parser.Dashboard, reg *parser.Registry) map[string]any {
 	index := map[string]int{}
 	for i, name := range widgetMeasures(w) {
 		index[name] = i
 	}
 	placed := map[string]bool{}
-	rows := placePivot(w.Rows, index, placed)
-	cols := placePivot(w.Columns, index, placed)
+	rows := placePivot(w.Rows, index, placed, d, reg)
+	cols := placePivot(w.Columns, index, placed, d, reg)
 	values := []any{}
 	for _, name := range widgetMeasures(w) {
 		if placed[name] {
@@ -75,11 +75,11 @@ func pivotColumnSplit(w parser.Widget) map[string]any {
 	return map[string]any{"rows": rows, "columns": cols, "values": values}
 }
 
-func placePivot(items []parser.PivotField, index map[string]int, placed map[string]bool) []any {
+func placePivot(items []parser.PivotField, index map[string]int, placed map[string]bool, d *parser.Dashboard, reg *parser.Registry) []any {
 	out := []any{}
 	for _, item := range items {
 		if item.Dimension != "" {
-			out = append(out, item.Dimension)
+			out = append(out, columnName(d, reg, item.Dimension, true))
 			continue
 		}
 		if item.Measure == "" {

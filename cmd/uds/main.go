@@ -187,9 +187,19 @@ func expandModelPaths(raw string) ([]string, error) {
 				continue
 			}
 			name := e.Name()
-			if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
-				out = append(out, filepath.Join(p, name))
+			if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") {
+				continue
 			}
+			path := filepath.Join(p, name)
+			kind, err := parser.PeekKind(path)
+			if err != nil {
+				return nil, fmt.Errorf("kind %s: %w", path, err)
+			}
+			if kind != "SemanticModel" {
+				fmt.Fprintf(os.Stderr, "skipped %s (kind %q)\n", path, kind)
+				continue
+			}
+			out = append(out, path)
 		}
 	}
 	return out, nil

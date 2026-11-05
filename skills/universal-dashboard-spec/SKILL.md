@@ -15,7 +15,7 @@ Write or edit UDS YAML that agents and the CLI can validate and compile.
 2. Match the preferred chart type for that intent. `combo` is accepted for `time_series`, `nominal_comparison`, and `deviation`.
 3. Declare measures and dimensions once; reference them by name.
 4. Use the 24-column grid for layout.
-5. Optionally declare `spec.source` for Metabase.
+5. Optionally declare `spec.source` for Metabase. A card that references a SemanticModel uses that model's source. A dimension from a second model joins on a shared entity.
 
 ## Canonical intents
 

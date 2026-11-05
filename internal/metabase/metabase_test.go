@@ -126,6 +126,9 @@ func TestEmitWorkbookFeatures(t *testing.T) {
 			if !strings.Contains(s, "year") || !strings.Contains(s, "\"2024\"") && !strings.Contains(s, "2024") {
 				t.Fatalf("fixed filter missing:\n%s", s)
 			}
+			if !strings.Contains(s, `"="`) {
+				t.Fatalf("operator = must be quoted\n%s", s)
+			}
 		case strings.Contains(name, "avg.yaml"):
 			if !strings.Contains(s, "filter:") {
 				t.Fatal("avg where should fall back to a query filter")
@@ -158,6 +161,9 @@ func TestEmitWorkbookFeatures(t *testing.T) {
 		case strings.Contains(name, "notes"):
 			t.Fatal("text widget should not become a question card")
 		}
+	}
+	if strings.Contains(dash, "template-tag") {
+		t.Fatalf("filter mapping still targets a template tag\n%s", dash)
 	}
 	if !strings.Contains(dash, "searchable: true") || !strings.Contains(dash, "orders.segment") {
 		t.Fatalf("dashboard filter missing searchable bindings:\n%s", dash)
