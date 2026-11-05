@@ -11,8 +11,8 @@ Write or edit UDS YAML that agents and the CLI can validate and compile.
 
 ## Checklist
 
-1. Set `intent` on every widget (required for new specs).
-2. Match the preferred chart type for that intent.
+1. Set `intent` on every analytical widget. Omit it on `text` and `image`.
+2. Match the preferred chart type for that intent. `combo` is accepted for `time_series`, `nominal_comparison`, and `deviation`.
 3. Declare measures and dimensions once; reference them by name.
 4. Use the 24-column grid for layout.
 5. Optionally declare `spec.source` for Metabase.
@@ -21,11 +21,11 @@ Write or edit UDS YAML that agents and the CLI can validate and compile.
 
 | Intent | Preferred type | Use when |
 |--------|----------------|----------|
-| `nominal_comparison` | `bar` | Unordered categories |
+| `nominal_comparison` | `bar`, `combo` | Unordered categories |
 | `ranking` | `bar` | Ordered magnitude |
-| `time_series` | `line`, `area` | Change over time |
+| `time_series` | `line`, `area`, `combo` | Change over time |
 | `part_to_whole` | `stacked_bar`, `pie` | Share of total |
-| `deviation` | `bar`, `line` | Difference from a reference |
+| `deviation` | `bar`, `line`, `combo` | Difference from a reference |
 | `distribution` | `bar`, `heatmap` | Spread of values |
 | `correlation` | `scatter`, `heatmap` | Two measures |
 | `lookup` | `table`, `number` | Exact values or KPI |

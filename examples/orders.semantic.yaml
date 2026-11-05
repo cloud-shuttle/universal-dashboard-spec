@@ -30,6 +30,13 @@ spec:
     - name: product
       type: categorical
       field: product_name
+    - name: status
+      type: categorical
+      field: status
+    - name: amount
+      title: Order Amount
+      type: number
+      field: amount
 
   measures:
     - name: revenue
@@ -45,6 +52,17 @@ spec:
       title: Average Order Value (raw)
       aggregation: avg
       field: amount
+    - name: lost_revenue
+      title: Lost Revenue
+      aggregation: sum
+      field: amount
+      where:
+        - dimension: status
+          operator: eq
+          value: Lost Customer
+    - name: revenue_change
+      title: Revenue Change
+      expression: revenue - lost_revenue
 
   metrics:
     - name: avg_order_value

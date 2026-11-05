@@ -48,6 +48,9 @@ func main() {
 			if err != nil {
 				log.Fatalf("load model %s: %v", p, err)
 			}
+			if err := m.Validate(); err != nil {
+				log.Fatalf("model %s: %v", p, err)
+			}
 			reg.Add(m)
 			fmt.Fprintf(os.Stderr, "loaded model %s from %s\n", m.Metadata.Name, p)
 		}

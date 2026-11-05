@@ -87,27 +87,46 @@ type Parameter struct {
 	Description string            `yaml:"description,omitempty"`
 }
 
+// Predicate is a constant row comparison. Used by measure where clauses and widget fixedFilters.
+type Predicate struct {
+	Dimension string `yaml:"dimension"`
+	Operator  string `yaml:"operator"`
+	Value     any    `yaml:"value,omitempty"`
+}
+
+// PivotField is one entry in a pivot row or column order.
+// Exactly one of Dimension or Measure is set.
+type PivotField struct {
+	Dimension string `yaml:"dimension,omitempty"`
+	Measure   string `yaml:"measure,omitempty"`
+}
+
 type Measure struct {
-	Name        string `yaml:"name"`
-	Title       string `yaml:"title,omitempty"`
-	Aggregation string `yaml:"aggregation"`
-	Field       string `yaml:"field,omitempty"`
-	Format      string `yaml:"format,omitempty"`
-	Description string `yaml:"description,omitempty"`
+	Name        string      `yaml:"name"`
+	Title       string      `yaml:"title,omitempty"`
+	Aggregation string      `yaml:"aggregation,omitempty"`
+	Expression  string      `yaml:"expression,omitempty"`
+	Field       string      `yaml:"field,omitempty"`
+	Format      string      `yaml:"format,omitempty"`
+	Description string      `yaml:"description,omitempty"`
+	Where       []Predicate `yaml:"where,omitempty"`
 }
 
 type Dimension struct {
-	Name          string `yaml:"name"`
-	Title         string `yaml:"title,omitempty"`
-	Field         string `yaml:"field,omitempty"`
-	Type          string `yaml:"type,omitempty"`
-	TemporalGrain string `yaml:"temporalGrain,omitempty"`
+	Name          string   `yaml:"name"`
+	Title         string   `yaml:"title,omitempty"`
+	Field         string   `yaml:"field,omitempty"`
+	Type          string   `yaml:"type,omitempty"`
+	TemporalGrain string   `yaml:"temporalGrain,omitempty"`
+	Grains        []string `yaml:"grains,omitempty"`
 }
 
 type Filter struct {
 	Name        string   `yaml:"name"`
 	Title       string   `yaml:"title,omitempty"`
-	Dimension   string   `yaml:"dimension"`
+	Dimension   string   `yaml:"dimension,omitempty"`
+	Bindings    []string `yaml:"bindings,omitempty"`
+	Searchable  bool     `yaml:"searchable,omitempty"`
 	Control     string   `yaml:"control,omitempty"`
 	Values      []string `yaml:"values,omitempty"`
 	Multi       bool     `yaml:"multi,omitempty"`
@@ -116,8 +135,9 @@ type Filter struct {
 }
 
 type Tab struct {
-	Name  string `yaml:"name"`
-	Title string `yaml:"title"`
+	Name          string `yaml:"name"`
+	Title         string `yaml:"title"`
+	TitleTemplate string `yaml:"titleTemplate,omitempty"`
 }
 
 type Widget struct {
@@ -130,6 +150,12 @@ type Widget struct {
 	Measures      []string       `yaml:"measures,omitempty"`
 	Dimensions    []string       `yaml:"dimensions,omitempty"`
 	Filters       []string       `yaml:"filters,omitempty"`
+	TimeGrain     string         `yaml:"timeGrain,omitempty"`
+	Content       string         `yaml:"content,omitempty"`
+	Src           string         `yaml:"src,omitempty"`
+	FixedFilters  []Predicate    `yaml:"fixedFilters,omitempty"`
+	Rows          []PivotField   `yaml:"rows,omitempty"`
+	Columns       []PivotField   `yaml:"columns,omitempty"`
 	Parameters    []string       `yaml:"parameters,omitempty"`
 	Actions       []Action       `yaml:"actions,omitempty"`
 	Series        []Series       `yaml:"series,omitempty"`
@@ -208,11 +234,11 @@ var knownIntents = map[string]bool{
 
 // preferredTypes maps intent → preferred chart types. Empty means any is acceptable.
 var preferredTypes = map[string][]string{
-	"nominal_comparison": {"bar"},
+	"nominal_comparison": {"bar", "combo"},
 	"ranking":            {"bar"},
-	"time_series":        {"line", "area"},
+	"time_series":        {"line", "area", "combo"},
 	"part_to_whole":      {"stacked_bar", "pie"},
-	"deviation":          {"bar", "line", "diverging"},
+	"deviation":          {"bar", "line", "diverging", "combo"},
 	"distribution":       {"bar", "heatmap"},
 	"correlation":        {"scatter", "heatmap"},
 	"lookup":             {"table", "number", "pivot"},
@@ -375,11 +401,41 @@ func normalize(v any) (any, error) {
 	}
 }
 
-// Validate checks known intents and recommended type pairings.
-// Returns a list of warning messages (non-fatal) and an error only for hard failures
-// (unknown intent). Type mismatches are warnings so existing specs keep working.
+// Validate checks measures, filters, pivot entries, and intent/type pairings.
+// Unknown intent, a bad expression, and a measure with both aggregation and
+// expression are errors. A known intent paired with a non-preferred type is a warning.
+// text and image widgets have no analytical intent, so that check is skipped.
 func (d *Dashboard) Validate() (warnings []string, err error) {
-	for i, w := range d.Spec.Widgets {
+	if err := validateMeasures(d.Spec.Measures); err != nil {
+		return nil, err
+	}
+	for _, f := range d.Spec.Filters {
+		if f.Dimension == "" && len(f.Bindings) == 0 {
+			return nil, fmt.Errorf("filter %q: set dimension or bindings", f.Name)
+		}
+	}
+	for _, w := range d.Spec.Widgets {
+		if err := validatePredicates(w.FixedFilters); err != nil {
+			return nil, fmt.Errorf("widget %q: %w", w.ID, err)
+		}
+		if err := validatePivot(w.Rows); err != nil {
+			return nil, fmt.Errorf("widget %q rows: %w", w.ID, err)
+		}
+		if err := validatePivot(w.Columns); err != nil {
+			return nil, fmt.Errorf("widget %q columns: %w", w.ID, err)
+		}
+		switch w.Type {
+		case "text":
+			if w.Content == "" {
+				return nil, fmt.Errorf("widget %q: text requires content", w.ID)
+			}
+			continue
+		case "image":
+			if w.Src == "" {
+				return nil, fmt.Errorf("widget %q: image requires src", w.ID)
+			}
+			continue
+		}
 		if w.Intent == "" {
 			continue
 		}
@@ -403,9 +459,58 @@ func (d *Dashboard) Validate() (warnings []string, err error) {
 				w.ID, w.Title, w.Intent, preferred, w.Type,
 			))
 		}
-		_ = i // silence unused in case of future use
 	}
 	return warnings, nil
+}
+
+// Validate checks semantic measures: aggregation xor expression, expression grammar, and where clauses.
+func (m *SemanticModel) Validate() error {
+	return validateMeasures(m.Spec.Measures)
+}
+
+func validateMeasures(measures []Measure) error {
+	for _, m := range measures {
+		hasAgg := m.Aggregation != ""
+		hasExpr := m.Expression != ""
+		if hasAgg == hasExpr {
+			return fmt.Errorf("measure %q: set aggregation or expression, not both", m.Name)
+		}
+		if hasExpr {
+			if _, err := ParseExpression(m.Expression); err != nil {
+				return fmt.Errorf("measure %q: %w", m.Name, err)
+			}
+		}
+		if err := validatePredicates(m.Where); err != nil {
+			return fmt.Errorf("measure %q: %w", m.Name, err)
+		}
+	}
+	return nil
+}
+
+var predicateOps = map[string]bool{
+	"eq": true, "neq": true, "in": true, "not_in": true,
+	"gt": true, "gte": true, "lt": true, "lte": true,
+}
+
+func validatePredicates(ps []Predicate) error {
+	for _, p := range ps {
+		if p.Dimension == "" {
+			return fmt.Errorf("predicate missing dimension")
+		}
+		if !predicateOps[p.Operator] {
+			return fmt.Errorf("predicate on %q: unknown operator %q", p.Dimension, p.Operator)
+		}
+	}
+	return nil
+}
+
+func validatePivot(items []PivotField) error {
+	for _, item := range items {
+		if (item.Dimension == "") == (item.Measure == "") {
+			return fmt.Errorf("each entry needs a dimension or a measure")
+		}
+	}
+	return nil
 }
 
 // SourceOrDefault returns the source from the spec, or the provided defaults

@@ -76,6 +76,143 @@ func TestValidateIntentMismatchIsWarning(t *testing.T) {
 	}
 }
 
+func TestEmbeddedSchemasMatch(t *testing.T) {
+	pairs := [][2]string{
+		{"schema.json", "../../schema/dashboard.json"},
+		{"semantic-model.json", "../../schema/semantic-model.json"},
+	}
+	for _, pair := range pairs {
+		a, err := os.ReadFile(pair[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := os.ReadFile(pair[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(a) != string(b) {
+			t.Fatalf("%s differs from %s", pair[0], pair[1])
+		}
+	}
+}
+
+func TestExamplesLoad(t *testing.T) {
+	dash, err := Load("../../examples/sales-overview-semantic.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dash.Spec.Models) != 1 || dash.Spec.Models[0] != "orders" {
+		t.Fatalf("models = %v", dash.Spec.Models)
+	}
+
+	model, err := LoadSemanticModel("../../examples/orders.semantic.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := model.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	var number, lost, change bool
+	for _, d := range model.Spec.Dimensions {
+		if d.Name == "amount" && d.Type == "number" {
+			number = true
+		}
+		if d.Name == "ordered_at" && len(d.Grains) != 5 {
+			t.Fatalf("grains = %v", d.Grains)
+		}
+	}
+	for _, m := range model.Spec.Measures {
+		if m.Name == "lost_revenue" && len(m.Where) == 1 && m.Where[0].Value == "Lost Customer" {
+			lost = true
+		}
+		if m.Name == "revenue_change" && m.Expression == "revenue - lost_revenue" {
+			change = true
+		}
+	}
+	if !number || !lost || !change {
+		t.Fatalf("number=%v lost=%v change=%v", number, lost, change)
+	}
+}
+
+func TestWorkbookExample(t *testing.T) {
+	d, err := Load("../../examples/workbook.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	warnings, err := d.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %v", warnings)
+	}
+	if d.Spec.Widgets[0].TimeGrain != "quarter" {
+		t.Fatalf("timeGrain = %q", d.Spec.Widgets[0].TimeGrain)
+	}
+	if d.Spec.Tabs[0].TitleTemplate != "{{year}} Performance" {
+		t.Fatalf("tab template = %q", d.Spec.Tabs[0].TitleTemplate)
+	}
+	if !d.Spec.Filters[0].Searchable || len(d.Spec.Filters[0].Bindings) != 2 {
+		t.Fatalf("filter = %+v", d.Spec.Filters[0])
+	}
+	bridge := d.Spec.Widgets[2]
+	if bridge.Rows[0].Dimension != "segment" || bridge.Rows[1].Measure != "mrr" {
+		t.Fatalf("rows = %+v", bridge.Rows)
+	}
+}
+
+func TestValidateExpressionRules(t *testing.T) {
+	if _, err := ParseExpression("mrr - prev_mrr"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseExpression("(a + b) * 2"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseExpression("sum(mrr)"); err == nil {
+		t.Fatal("expected function call to fail")
+	}
+
+	both := &Dashboard{Spec: Spec{Measures: []Measure{{
+		Name: "m", Aggregation: "sum", Expression: "mrr - prev_mrr",
+	}}}}
+	if _, err := both.Validate(); err == nil {
+		t.Fatal("expected aggregation/expression conflict")
+	}
+
+	bad := &Dashboard{Spec: Spec{Measures: []Measure{{
+		Name: "m", Expression: "mrr; drop table",
+	}}}}
+	if _, err := bad.Validate(); err == nil {
+		t.Fatal("expected bad expression")
+	}
+}
+
+func TestComboIntentWarnings(t *testing.T) {
+	ok := &Dashboard{Spec: Spec{
+		Measures: []Measure{{Name: "m", Aggregation: "sum"}},
+		Widgets:  []Widget{{ID: "c", Type: "combo", Intent: "time_series", Title: "C"}},
+	}}
+	warnings, err := ok.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %v", warnings)
+	}
+
+	rank := &Dashboard{Spec: Spec{
+		Measures: []Measure{{Name: "m", Aggregation: "sum"}},
+		Widgets:  []Widget{{ID: "c", Type: "combo", Intent: "ranking", Title: "C"}},
+	}}
+	warnings, err = rank.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("warnings = %v", warnings)
+	}
+}
+
 func TestSourceOrDefault(t *testing.T) {
 	d := &Dashboard{Spec: Spec{Source: &Source{Database: "X", Table: "T"}}}
 	db, schema, table := d.SourceOrDefault("defDB", "defSchema", "defTable")

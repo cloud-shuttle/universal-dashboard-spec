@@ -4,12 +4,12 @@ You are writing a Universal Dashboard Specification (UDS) YAML file.
 
 ## Rules
 
-1. **Always set `intent`** on every widget. Use one of:
-   - `nominal_comparison` — discrete categories, no natural order → prefer `bar`
+1. **Always set `intent`** on every analytical widget. Omit it on `text` and `image`. Use one of:
+   - `nominal_comparison` — discrete categories, no natural order → prefer `bar` (`combo` when series mix bar and line)
    - `ranking` — ordered magnitude → prefer `bar` (mention sort in options if needed)
-   - `time_series` — change over time → prefer `line` or `area`
+   - `time_series` — change over time → prefer `line` or `area` (`combo` when series mix bar and line)
    - `part_to_whole` — share of a total → prefer `stacked_bar` (limit `pie`)
-   - `deviation` — difference from a reference → prefer `bar` or `line` + `options.goalLine`
+   - `deviation` — difference from a reference → prefer `bar` or `line` (`combo` is accepted) + `options.goalLine`
    - `distribution` — spread of values → prefer `bar` or `heatmap`
    - `correlation` — relationship between two measures → prefer `scatter` or `heatmap`
    - `lookup` — exact values or single KPI → prefer `table` or `number`

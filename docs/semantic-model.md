@@ -67,8 +67,8 @@ spec:
 ## Core concepts (kept deliberately small)
 
 - **entities** — join keys (`primary` or `foreign`). Required for multi-model joins later.
-- **dimensions** — attributes to group or filter by. Types: `categorical` or `time`. Time dimensions declare allowed `grains`.
-- **measures** — atomic aggregations (`sum`, `count`, `count_distinct`, `avg`, `min`, `max`).
+- **dimensions** — attributes to group or filter by. Types: `categorical`, `time`, or `number`. Time dimensions declare allowed `grains`.
+- **measures** — atomic aggregations (`sum`, `count`, `count_distinct`, `avg`, `min`, `max`) or an `expression` over other measures (`mrr - prev_mrr`). A measure may set `where` to aggregate only matching rows. Set `aggregation` or `expression`, not both.
 - **metrics** — business metrics built from measures. Supported types in v1:
   - `simple` (default) — just the measure
   - `ratio` — numerator / denominator

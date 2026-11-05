@@ -74,7 +74,7 @@ func TestCLI_EChartsHasSeries(t *testing.T) {
 	if !strings.Contains(s, "series") {
 		t.Fatal("echarts output missing series")
 	}
-	if !strings.Contains(s, ""type": "line"") && !strings.Contains(s, "\"type\": \"line\"") {
+	if !strings.Contains(s, "\"type\": \"line\"") && !strings.Contains(s, "\"type\":\"line\"") {
 		// JSON marshal uses no spaces around colon in some cases; accept either
 		if !strings.Contains(s, "line") {
 			t.Fatal("expected line series in revenue_over_time.ts")

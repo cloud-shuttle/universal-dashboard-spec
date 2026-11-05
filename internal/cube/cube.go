@@ -34,6 +34,8 @@ func Emit(m *parser.SemanticModel) ([]byte, error) {
 		switch d.Type {
 		case "time":
 			dim["type"] = "time"
+		case "number":
+			dim["type"] = "number"
 		case "categorical":
 			dim["type"] = "string"
 		default:
@@ -53,8 +55,24 @@ func Emit(m *parser.SemanticModel) ([]byte, error) {
 	for _, meas := range m.Spec.Measures {
 		mm := map[string]any{
 			"name": meas.Name,
-			"sql":  meas.Field,
-			"type": mapAgg(meas.Aggregation),
+		}
+		if meas.Expression != "" {
+			ex, err := parser.ParseExpression(meas.Expression)
+			if err != nil {
+				return nil, fmt.Errorf("measure %s: %w", meas.Name, err)
+			}
+			mm["type"] = "number"
+			mm["sql"] = parser.FormatExpr(ex, func(name string) string { return "{" + name + "}" })
+		} else {
+			mm["sql"] = meas.Field
+			mm["type"] = mapAgg(meas.Aggregation)
+			if len(meas.Where) > 0 {
+				filters := make([]map[string]any, 0, len(meas.Where))
+				for _, p := range meas.Where {
+					filters = append(filters, map[string]any{"sql": predicateSQL(p)})
+				}
+				mm["filters"] = filters
+			}
 		}
 		if meas.Title != "" {
 			mm["title"] = meas.Title
@@ -97,6 +115,51 @@ func qualify(s *parser.Source) string {
 		parts = append(parts, s.Table)
 	}
 	return strings.Join(parts, ".")
+}
+
+func predicateSQL(p parser.Predicate) string {
+	col := "{CUBE}." + p.Dimension
+	switch p.Operator {
+	case "neq":
+		return col + " != " + sqlLiteral(p.Value)
+	case "gt":
+		return col + " > " + sqlLiteral(p.Value)
+	case "gte":
+		return col + " >= " + sqlLiteral(p.Value)
+	case "lt":
+		return col + " < " + sqlLiteral(p.Value)
+	case "lte":
+		return col + " <= " + sqlLiteral(p.Value)
+	case "in":
+		return col + " IN (" + sqlList(p.Value) + ")"
+	case "not_in":
+		return col + " NOT IN (" + sqlList(p.Value) + ")"
+	default:
+		return col + " = " + sqlLiteral(p.Value)
+	}
+}
+
+func sqlList(v any) string {
+	items, ok := v.([]any)
+	if !ok {
+		return sqlLiteral(v)
+	}
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		parts = append(parts, sqlLiteral(item))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func sqlLiteral(v any) string {
+	switch t := v.(type) {
+	case string:
+		return "'" + strings.ReplaceAll(t, "'", "''") + "'"
+	case int, int64, float64, bool:
+		return fmt.Sprint(t)
+	default:
+		return "'" + strings.ReplaceAll(fmt.Sprint(t), "'", "''") + "'"
+	}
 }
 
 func mapAgg(a string) string {

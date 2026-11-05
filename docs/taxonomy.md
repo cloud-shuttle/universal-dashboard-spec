@@ -10,11 +10,11 @@ These cover Stephen Few’s seven quantitative relationships plus the practical 
 
 | Intent | What it answers | Preferred encodings (current UDS types) | Notes |
 |--------|-----------------|----------------------------------------|-------|
-| `nominal_comparison` | How do discrete categories compare? | `bar` | Unordered categories. |
+| `nominal_comparison` | How do discrete categories compare? | `bar`, `combo` | Unordered categories. `combo` when series mix bar and line. |
 | `ranking` | What is the ordered magnitude? | `bar` | Prefer sorted descending (or ascending). |
-| `time_series` | How did it change over time? | `line`, `area` | Temporal dimension on the horizontal axis. |
+| `time_series` | How did it change over time? | `line`, `area`, `combo` | Temporal dimension on the horizontal axis. `combo` when series mix bar and line. |
 | `part_to_whole` | What share does each part contribute? | `stacked_bar`, `pie` | Prefer stacked bars for precise comparison; limit pies to few parts. |
-| `deviation` | How do values differ from a reference? | `bar`, `line` | Use a reference line or baseline (see `options.goalLine`). |
+| `deviation` | How do values differ from a reference? | `bar`, `line`, `combo` | Use a reference line or baseline (see `options.goalLine`). |
 | `distribution` | How are values spread? | `bar` (as histogram), `heatmap` | Binning or density. |
 | `correlation` | Do two measures move together? | `scatter`, `heatmap` | Two quantitative measures. |
 | `lookup` | Exact values or single KPIs | `table`, `number` | When precision or scanning matters more than pattern. |
@@ -28,7 +28,8 @@ The CLI and parser run a lightweight check on load:
 - JSON Schema validation (embedded `schema.json`) runs first — missing required fields and bad enums fail hard.
 - Unknown `intent` values are **errors** (hard fail).
 - A known intent paired with a non-preferred `type` produces a **warning** on stderr. Compilation still succeeds so existing specs remain valid.
-- Missing intent is always fine (optional in v1).
+- Missing intent is always fine (optional in v1). Omit it on `text` and `image` widgets.
+- `combo` is an accepted encoding for `time_series`, `nominal_comparison`, and `deviation`. Other intents still warn.
 - Pass `--strict` to promote those warnings to fatal errors.
 
 Example warning:

@@ -1,0 +1,121 @@
+apiVersion: uds/v1
+kind: Dashboard
+metadata:
+  name: workbook
+  title: Workbook
+  description: Filtered measures, expressions, grains, fixed filters, pivot order, and static widgets
+
+spec:
+  parameters:
+    - name: year
+      title: Year
+      type: string
+      values: ["2023", "2024"]
+      default: "2024"
+
+  measures:
+    - name: mrr
+      title: MRR
+      aggregation: sum
+      field: mrr
+      format: currency
+    - name: prev_mrr
+      title: Previous MRR
+      aggregation: sum
+      field: prev_mrr
+      format: currency
+    - name: lost_mrr
+      title: Lost MRR
+      aggregation: sum
+      field: mrr
+      format: currency
+      where:
+        - dimension: customer_status
+          operator: eq
+          value: Lost Customer
+    - name: mrr_change
+      title: MRR Change
+      expression: mrr - prev_mrr
+      format: currency
+
+  dimensions:
+    - name: month
+      title: Month
+      field: month_start
+      type: date
+      temporalGrain: month
+    - name: segment
+      title: Segment
+      field: segment
+      type: string
+    - name: product
+      title: Product
+      field: product
+      type: string
+
+  filters:
+    - name: segment
+      title: Segment
+      control: multi_select
+      searchable: true
+      bindings: [orders.segment, customers.segment]
+
+  tabs:
+    - name: year
+      title: Year
+      titleTemplate: "{{year}} Performance"
+
+  widgets:
+    - id: mrr_quarter
+      type: combo
+      intent: time_series
+      title: MRR by Quarter
+      tab: year
+      measures: [mrr, mrr_change]
+      dimensions: [month]
+      timeGrain: quarter
+      filters: [segment]
+      series:
+        - name: mrr
+          type: bar
+          axis: left
+        - name: mrr_change
+          type: line
+          axis: right
+      layout: { x: 0, y: 0, w: 16, h: 8 }
+
+    - id: mrr_2024
+      type: number
+      intent: lookup
+      title: 2024 MRR
+      measures: [mrr]
+      fixedFilters:
+        - dimension: year
+          operator: eq
+          value: "2024"
+      layout: { x: 16, y: 0, w: 8, h: 4 }
+
+    - id: bridge
+      type: pivot
+      intent: lookup
+      title: MRR Bridge
+      rows:
+        - dimension: segment
+        - measure: mrr
+        - measure: lost_mrr
+        - measure: mrr_change
+      columns:
+        - dimension: product
+      layout: { x: 0, y: 8, w: 16, h: 8 }
+
+    - id: note
+      type: text
+      title: Notes
+      content: Lost MRR sums only rows whose status is Lost Customer.
+      layout: { x: 16, y: 4, w: 8, h: 4 }
+
+    - id: logo
+      type: image
+      title: Logo
+      src: assets/logo.png
+      layout: { x: 16, y: 8, w: 8, h: 4 }

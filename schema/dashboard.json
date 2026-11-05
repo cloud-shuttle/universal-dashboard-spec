@@ -18,7 +18,7 @@
     },
     "spec": {
       "type": "object",
-      "required": ["measures", "dimensions", "widgets"],
+      "required": ["widgets"],
       "properties": {
         "source": { "$ref": "#/$defs/source" },
         "models": {
@@ -92,18 +92,49 @@
         "description": { "type": "string" }
       }
     },
+    "predicate": {
+      "type": "object",
+      "required": ["dimension", "operator", "value"],
+      "properties": {
+        "dimension": { "type": "string" },
+        "operator": {
+          "enum": ["eq", "neq", "in", "not_in", "gt", "gte", "lt", "lte"]
+        },
+        "value": {
+          "description": "Comparison value. An array when operator is in or not_in."
+        }
+      }
+    },
+    "pivotField": {
+      "type": "object",
+      "description": "One pivot axis entry. Set dimension or measure, not both.",
+      "properties": {
+        "dimension": { "type": "string" },
+        "measure": { "type": "string" }
+      }
+    },
     "measure": {
       "type": "object",
-      "required": ["name", "aggregation"],
+      "required": ["name"],
       "properties": {
         "name": { "type": "string" },
         "title": { "type": "string" },
         "aggregation": {
+          "description": "Set this or expression, not both.",
           "enum": ["sum", "count", "count_distinct", "avg", "min", "max", "ltm"]
+        },
+        "expression": {
+          "type": "string",
+          "description": "Arithmetic over other measures, e.g. mrr - prev_mrr. Identifiers, numbers, + - * /, and parentheses. Set this or aggregation, not both."
         },
         "field": { "type": "string" },
         "format": { "type": "string" },
-        "description": { "type": "string" }
+        "description": { "type": "string" },
+        "where": {
+          "type": "array",
+          "description": "Row predicates applied before this aggregation.",
+          "items": { "$ref": "#/$defs/predicate" }
+        }
       }
     },
     "dimension": {
@@ -121,11 +152,22 @@
     },
     "filter": {
       "type": "object",
-      "required": ["name", "dimension"],
+      "required": ["name"],
+      "description": "Set dimension or bindings. bindings lets one control slice the same idea on more than one model.",
       "properties": {
         "name": { "type": "string" },
         "title": { "type": "string" },
         "dimension": { "type": "string" },
+        "bindings": {
+          "type": "array",
+          "description": "Dimension names or model.dimension names this filter applies to.",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "searchable": {
+          "type": "boolean",
+          "description": "Show a search box on this control. Typical with multi_select."
+        },
         "control": {
           "description": "UI control to render for this filter",
           "enum": ["dropdown", "multi_select", "radio", "date_picker", "date_range", "slider", "search"]
@@ -149,7 +191,11 @@
       "required": ["name", "title"],
       "properties": {
         "name": { "type": "string" },
-        "title": { "type": "string" }
+        "title": { "type": "string" },
+        "titleTemplate": {
+          "description": "Dynamic tab title, e.g. '{{year}} ARR'",
+          "type": "string"
+        }
       }
     },
     "widget": {
@@ -170,7 +216,9 @@
             "heatmap",
             "pivot",
             "combo",
-            "diverging"
+            "diverging",
+            "text",
+            "image"
           ]
         },
         "intent": {
@@ -195,6 +243,33 @@
         "measures": { "type": "array", "items": { "type": "string" } },
         "dimensions": { "type": "array", "items": { "type": "string" } },
         "filters": { "type": "array", "items": { "type": "string" } },
+        "timeGrain": {
+          "description": "Grain for this widget's time dimension. Overrides the dimension temporalGrain.",
+          "enum": ["day", "week", "month", "quarter", "year"]
+        },
+        "content": {
+          "description": "Body for type=text",
+          "type": "string"
+        },
+        "src": {
+          "description": "Image location for type=image",
+          "type": "string"
+        },
+        "fixedFilters": {
+          "description": "Constant predicates for this widget. Not user-facing controls.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/predicate" }
+        },
+        "rows": {
+          "description": "Pivot row order. Mix dimensions and measures.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/pivotField" }
+        },
+        "columns": {
+          "description": "Pivot column order. Mix dimensions and measures.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/pivotField" }
+        },
         "parameters": {
           "description": "Parameters this widget consumes",
           "type": "array",

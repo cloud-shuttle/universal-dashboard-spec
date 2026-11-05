@@ -35,7 +35,7 @@ func buildOption(w parser.Widget, d *parser.Dashboard) map[string]any {
 	}
 
 	opt := map[string]any{
-		"title": map[string]any{"text": title},
+		"title":   map[string]any{"text": title},
 		"tooltip": map[string]any{"trigger": tooltipTrigger(w.Type)},
 	}
 
@@ -104,14 +104,30 @@ func buildOption(w parser.Widget, d *parser.Dashboard) map[string]any {
 	case "number":
 		opt["series"] = []any{
 			map[string]any{
-				"type": "gauge",
+				"type":   "gauge",
 				"detail": map[string]any{"formatter": "{value}"},
-				"data": []any{map[string]any{"value": 0, "name": title}},
+				"data":   []any{map[string]any{"value": 0, "name": title}},
 			},
 		}
 
+	case "text":
+		opt["udsType"] = "text"
+		opt["content"] = w.Content
+		return opt
+
+	case "image":
+		opt["udsType"] = "image"
+		opt["src"] = w.Src
+		return opt
+
 	default:
 		opt["series"] = series
+	}
+
+	if w.TimeGrain != "" {
+		if axis, ok := opt["xAxis"].(map[string]any); ok {
+			axis["name"] = w.TimeGrain
+		}
 	}
 
 	// Goal line / markLine for deviation

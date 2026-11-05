@@ -66,7 +66,7 @@
       "properties": {
         "name": { "type": "string" },
         "title": { "type": "string" },
-        "type": { "enum": ["categorical", "time"] },
+        "type": { "enum": ["categorical", "time", "number"] },
         "field": { "type": "string" },
         "grains": {
           "type": "array",
@@ -76,18 +76,41 @@
         "description": { "type": "string" }
       }
     },
+    "predicate": {
+      "type": "object",
+      "required": ["dimension", "operator", "value"],
+      "properties": {
+        "dimension": { "type": "string" },
+        "operator": {
+          "enum": ["eq", "neq", "in", "not_in", "gt", "gte", "lt", "lte"]
+        },
+        "value": {
+          "description": "Comparison value. An array when operator is in or not_in."
+        }
+      }
+    },
     "measure": {
       "type": "object",
-      "required": ["name", "aggregation"],
+      "required": ["name"],
       "properties": {
         "name": { "type": "string" },
         "title": { "type": "string" },
         "aggregation": {
+          "description": "Set this or expression, not both.",
           "enum": ["sum", "count", "count_distinct", "avg", "min", "max", "ltm"]
+        },
+        "expression": {
+          "type": "string",
+          "description": "Arithmetic over other measures, e.g. mrr - prev_mrr. Identifiers, numbers, + - * /, and parentheses. Set this or aggregation, not both."
         },
         "field": { "type": "string" },
         "format": { "type": "string" },
-        "description": { "type": "string" }
+        "description": { "type": "string" },
+        "where": {
+          "type": "array",
+          "description": "Row predicates applied before this aggregation.",
+          "items": { "$ref": "#/$defs/predicate" }
+        }
       }
     },
     "metric": {

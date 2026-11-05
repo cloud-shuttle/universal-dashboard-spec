@@ -2,6 +2,7 @@ package excalidraw
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/parser"
@@ -57,7 +58,7 @@ func Emit(d *parser.Dashboard, reg *parser.Registry) ([]byte, error) {
 			StrokeColor:     "#1e1e1e",
 			BackgroundColor: "#e7f5ff",
 			FillStyle:       "solid",
-			Label:           &Label{Text: tab.Title},
+			Label:           &Label{Text: tabLabel(tab)},
 		})
 		x += 140
 	}
@@ -68,6 +69,9 @@ func Emit(d *parser.Dashboard, reg *parser.Registry) ([]byte, error) {
 		label := filter.Title
 		if filter.Control != "" {
 			label = filter.Control + ": " + label
+		}
+		if filter.Searchable {
+			label += " +search"
 		}
 		f.Elements = append(f.Elements, Element{
 			ID:              "filter-" + filter.Name,
@@ -123,8 +127,18 @@ func Emit(d *parser.Dashboard, reg *parser.Registry) ([]byte, error) {
 			label = w.Type + "\n" + w.Intent
 		}
 		label = label + "\n" + title
+		if w.TimeGrain != "" {
+			label = label + "\n" + w.TimeGrain
+		}
 		if titles := resolveMeasureTitles(w.Measures, d, reg); titles != "" {
 			label = label + "\n" + titles
+		}
+		if len(w.FixedFilters) > 0 {
+			var bits []string
+			for _, p := range w.FixedFilters {
+				bits = append(bits, fmtPredicate(p))
+			}
+			label = label + "\n" + strings.Join(bits, ", ")
 		}
 		if len(w.Series) > 0 {
 			var bits []string
@@ -205,6 +219,17 @@ func resolveMeasureTitles(names []string, d *parser.Dashboard, reg *parser.Regis
 	return strings.Join(titles, ", ")
 }
 
+func tabLabel(tab parser.Tab) string {
+	if tab.TitleTemplate != "" {
+		return tab.TitleTemplate
+	}
+	return tab.Title
+}
+
+func fmtPredicate(p parser.Predicate) string {
+	return p.Dimension + " " + p.Operator + " " + fmt.Sprint(p.Value)
+}
+
 func chartColor(t string) string {
 	switch t {
 	case "line":
@@ -215,6 +240,10 @@ func chartColor(t string) string {
 		return "#1971c2"
 	case "combo":
 		return "#9c36b5"
+	case "text":
+		return "#868e96"
+	case "image":
+		return "#0b7285"
 	default:
 		return "#495057"
 	}
@@ -230,6 +259,10 @@ func lighten(c string) string {
 		return "#e7f5ff"
 	case "#9c36b5":
 		return "#f3d9fa"
+	case "#868e96":
+		return "#f8f9fa"
+	case "#0b7285":
+		return "#e3fafc"
 	default:
 		return "#f8f9fa"
 	}
