@@ -8,80 +8,90 @@ User-set values that drive calculations or widget options (not just slicing).
 
 ```yaml
 parameters:
-  - name: target_margin
-    title: Target Margin
-    type: number
-    default: 0.3
-  - name: as_of_date
-    title: As Of
-    type: date
+  - name: period
+    title: Period
+    type: string
+    values: [Monthly, LTM]
+    affects: measure
+    default: Monthly
+  - name: currency
+    title: Currency View
+    type: string
+    values: [Reported, Constant]
+    affects: measure
 ```
 
-Widgets declare which parameters they consume:
-
-```yaml
-widgets:
-  - id: margin_vs_target
-    parameters: [target_margin]
-```
+`affects` says what the parameter changes: `measure`, `dimension`, `title`, `filter`, or `option`.
 
 ## Filter controls
 
-Existing filters gain UI behaviour.
-
 ```yaml
 filters:
+  - name: recurring
+    dimension: recurring_flag
+    control: radio
+    values: [Recurring, Non-Recurring]
   - name: region_filter
     dimension: region
     control: multi_select
     multi: true
-  - name: date_range
-    dimension: closed_date
-    control: date_range
-    required: true
-  - name: product_filter
-    dimension: product
-    control: dropdown
-    cascadeFrom: region_filter
 ```
 
-`control` values: `dropdown`, `multi_select`, `date_picker`, `date_range`, `slider`, `search`.
+`control` now includes `radio`.
 
-## Pivot tables
-
-New widget type.
+## Dynamic titles
 
 ```yaml
-- id: sales_pivot
-  type: pivot
-  title: Sales by Region and Product
-  measures: [revenue]
-  dimensions: [region, product]
-  options:
-    rows: [region]
-    columns: [product]
+- id: arr_trend
+  title: Monthly ARR
+  titleTemplate: "{{period}} ARR"
+  parameters: [period]
 ```
 
-## Drill actions
+## Combo and diverging charts
+
+New widget types: `combo` and `diverging`.
+
+## Series styling
 
 ```yaml
-- id: deals_by_region
-  actions:
-    - type: drill_to_dashboard
-      target: region-detail
-      parameterMappings:
-        region: region
-    - type: url
-      target: "https://example.com/deals?region={{region}}"
+series:
+  - name: revenue
+    color: "#1f77b4"
+    tooltipFields: [deal_count, avg_deal_size]
 ```
+
+## Pivot formatting
+
+Use `options` on a `pivot` widget:
+
+```yaml
+options:
+  rows: [region]
+  columns: [product]
+  groupedHeaders: true
+  boldTotals: true
+  bracketNegatives: true
+  conditionalColors:
+    - field: revenue
+      when: "< 0"
+      color: "#d62728"
+```
+
+## LTM
+
+`ltm` is a valid measure aggregation (last-twelve-months). Semantic models can also declare an LTM metric type.
 
 ## Status
 
-| Feature            | Schema | Parser | Emitters      |
-|--------------------|--------|--------|---------------|
-| Parameters         | yes    | yes    | pending       |
-| Filter controls    | yes    | yes    | pending       |
-| Pivot tables       | yes    | yes    | pending       |
-| Drill actions      | yes    | yes    | pending       |
+| Feature                  | Schema | Parser | Emitters |
+|--------------------------|--------|--------|----------|
+| Parameters + values + affects | yes | pending | pending |
+| Radio control            | yes    | pending | pending  |
+| Dynamic titles           | yes    | pending | pending  |
+| Combo / diverging        | yes    | pending | pending  |
+| Series colours + tooltips| yes    | pending | pending  |
+| Pivot formatting         | yes    | pending | pending  |
+| LTM aggregation          | yes    | pending | pending  |
 
-These are additive. Existing specs remain valid. Parser structs now load all four features; emitters still need to consume them.
+These are additive. Existing specs remain valid.
