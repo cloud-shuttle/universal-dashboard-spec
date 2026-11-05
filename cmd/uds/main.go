@@ -18,7 +18,7 @@ import (
 func main() {
 	var (
 		input    = flag.String("in", "", "Path to UDS Dashboard YAML file")
-		models   = flag.String("models", "", "Comma-separated paths to SemanticModel YAML files")
+		models   = flag.String("models", "", "Comma-separated paths to SemanticModel YAML files or directories containing them")
 		target   = flag.String("target", "excalidraw", "Target: excalidraw | metabase | echarts | cube")
 		out      = flag.String("out", "", "Output path (directory or file)")
 		strict   = flag.Bool("strict", false, "Treat intent/type mismatches as errors")
@@ -39,17 +39,17 @@ func main() {
 
 	reg := parser.NewRegistry()
 	if *models != "" {
-		for _, p := range strings.Split(*models, ",") {
-			p = strings.TrimSpace(p)
-			if p == "" {
-				continue
-			}
+		paths, err := expandModelPaths(*models)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, p := range paths {
 			m, err := parser.LoadSemanticModel(p)
 			if err != nil {
 				log.Fatalf("load model %s: %v", p, err)
 			}
 			reg.Add(m)
-			fmt.Fprintf(os.Stderr, "loaded model %s\n", m.Metadata.Name)
+			fmt.Fprintf(os.Stderr, "loaded model %s from %s\n", m.Metadata.Name, p)
 		}
 	}
 
@@ -130,21 +130,22 @@ func main() {
 		}
 
 	case "cube":
-		if *models == "" {
-			log.Fatal("cube target requires -models pointing at a SemanticModel")
+		if len(reg.Models()) == 0 {
+			log.Fatal("cube target requires -models pointing at a SemanticModel or directory")
 		}
-		first := strings.Split(*models, ",")[0]
-		m, err := parser.LoadSemanticModel(strings.TrimSpace(first))
-		if err != nil {
-			log.Fatal(err)
+		// Emit the first loaded model
+		var first *parser.SemanticModel
+		for _, m := range reg.Models() {
+			first = m
+			break
 		}
-		data, err := cube.Emit(m)
+		data, err := cube.Emit(first)
 		if err != nil {
 			log.Fatal(err)
 		}
 		path := *out
 		if path == "" {
-			path = m.Metadata.Name + ".cube.yaml"
+			path = first.Metadata.Name + ".cube.yaml"
 		}
 		if err := os.WriteFile(path, data, 0644); err != nil {
 			log.Fatal(err)
@@ -154,4 +155,39 @@ func main() {
 	default:
 		log.Fatalf("unknown target %q", *target)
 	}
+}
+
+// expandModelPaths turns a comma-separated list of files and/or directories
+// into a flat list of SemanticModel YAML paths. Directories are walked
+// non-recursively for *.yaml / *.yml files.
+func expandModelPaths(raw string) ([]string, error) {
+	var out []string
+	for _, p := range strings.Split(raw, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		info, err := os.Stat(p)
+		if err != nil {
+			return nil, fmt.Errorf("stat %s: %w", p, err)
+		}
+		if !info.IsDir() {
+			out = append(out, p)
+			continue
+		}
+		entries, err := os.ReadDir(p)
+		if err != nil {
+			return nil, fmt.Errorf("read dir %s: %w", p, err)
+		}
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			name := e.Name()
+			if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
+				out = append(out, filepath.Join(p, name))
+			}
+		}
+	}
+	return out, nil
 }

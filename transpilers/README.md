@@ -6,8 +6,9 @@ go run ./cmd/uds -in examples/sales-overview.yaml -target excalidraw -out out.ex
 
 go run ./cmd/uds -in examples/sales-overview.yaml -target metabase -out metabase-out
 # SemanticModel → Cube YAML
+# -models accepts files or directories (non-recursive *.yaml / *.yml)
 go run ./cmd/uds -in examples/sales-overview-semantic.yaml \
-  -models examples/orders.semantic.yaml \
+  -models examples/ \
   -target cube -out orders.cube.yaml
 ```
 

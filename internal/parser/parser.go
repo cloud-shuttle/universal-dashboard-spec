@@ -270,6 +270,15 @@ func (r *Registry) Get(name string) (*SemanticModel, bool) {
 	return m, ok
 }
 
+// Models returns all loaded SemanticModels (order is not guaranteed).
+func (r *Registry) Models() []*SemanticModel {
+	out := make([]*SemanticModel, 0, len(r.models))
+	for _, m := range r.models {
+		out = append(out, m)
+	}
+	return out
+}
+
 // ResolveMeasure looks up a measure or metric by qualified or unqualified name.
 // Returns the model name (if qualified), the measure/metric name, and whether it was found.
 func (r *Registry) ResolveMeasure(ref string, dash *Dashboard) (modelName, name string, found bool) {
