@@ -11,17 +11,23 @@ import (
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/parser"
 )
 
+// EmitOptions lets the CLI override the source table declared in the UDS.
+type EmitOptions struct {
+	Database string
+	Schema   string
+	Table    string
+}
+
 // Emit produces a map of filename → YAML content suitable for Metabase Representations import.
 // Entity IDs are deterministic (hash of name) so re-runs do not churn.
-func Emit(d *parser.Dashboard) (map[string][]byte, error) {
+// Source table is taken from the UDS spec.source block, then overridden by opts if non-empty.
+func Emit(d *parser.Dashboard, opts EmitOptions) (map[string][]byte, error) {
 	files := map[string][]byte{}
 
-	// For this minimal version we assume a single source table.
-	// A real emitter would take database/schema/table from the UDS or a side config.
-	const (
-		database = "Sample Database"
-		schema   = "PUBLIC"
-		table    = "ORDERS" // placeholder — replace with real table
+	db, schema, table := d.SourceOrDefault(
+		defaultIfEmpty(opts.Database, "Sample Database"),
+		defaultIfEmpty(opts.Schema, "PUBLIC"),
+		defaultIfEmpty(opts.Table, "ORDERS"),
 	)
 
 	cardIDs := map[string]string{} // widget ID → entity ID
@@ -36,7 +42,7 @@ func Emit(d *parser.Dashboard) (map[string][]byte, error) {
 			"display":     mapDisplay(w.Type),
 			"type":        "question",
 			"query_type":  "query",
-			"dataset_query": buildMBQL(w, d, database, schema, table),
+			"dataset_query": buildMBQL(w, d, db, schema, table),
 			"visualization_settings": buildVizSettings(w),
 			"serdes/meta": []map[string]string{{
 				"id":    eid,
@@ -74,6 +80,13 @@ func Emit(d *parser.Dashboard) (map[string][]byte, error) {
 	files[fmt.Sprintf("collections/main/dashboards/%s_%s.yaml", dashID, slug(d.Metadata.Title))] = b
 
 	return files, nil
+}
+
+func defaultIfEmpty(v, def string) string {
+	if v == "" {
+		return def
+	}
+	return v
 }
 
 func buildMBQL(w parser.Widget, d *parser.Dashboard, db, schema, table string) map[string]any {
