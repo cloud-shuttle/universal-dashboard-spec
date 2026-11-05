@@ -65,6 +65,10 @@ func Emit(d *parser.Dashboard, reg *parser.Registry) ([]byte, error) {
 	// Filters
 	x = 40
 	for _, filter := range d.Spec.Filters {
+		label := filter.Title
+		if filter.Control != "" {
+			label = filter.Control + ": " + label
+		}
 		f.Elements = append(f.Elements, Element{
 			ID:              "filter-" + filter.Name,
 			Type:            "rectangle",
@@ -75,7 +79,32 @@ func Emit(d *parser.Dashboard, reg *parser.Registry) ([]byte, error) {
 			StrokeColor:     "#1971c2",
 			BackgroundColor: "#e7f5ff",
 			FillStyle:       "solid",
-			Label:           &Label{Text: filter.Title},
+			Label:           &Label{Text: label},
+		})
+		x += 160
+	}
+
+	// Parameters
+	x = 40
+	for _, p := range d.Spec.Parameters {
+		label := p.Title
+		if label == "" {
+			label = p.Name
+		}
+		if p.Affects != "" {
+			label = label + " (" + p.Affects + ")"
+		}
+		f.Elements = append(f.Elements, Element{
+			ID:              "param-" + p.Name,
+			Type:            "rectangle",
+			X:               x,
+			Y:               140,
+			Width:           140,
+			Height:          32,
+			StrokeColor:     "#9c36b5",
+			BackgroundColor: "#f3d9fa",
+			FillStyle:       "solid",
+			Label:           &Label{Text: label},
 		})
 		x += 160
 	}
@@ -85,19 +114,37 @@ func Emit(d *parser.Dashboard, reg *parser.Registry) ([]byte, error) {
 	const rowH = 36
 	for _, w := range d.Spec.Widgets {
 		color := chartColor(w.Type)
+		title := w.Title
+		if w.TitleTemplate != "" {
+			title = w.TitleTemplate
+		}
 		label := w.Type
 		if w.Intent != "" {
 			label = w.Type + "\n" + w.Intent
 		}
-		label = label + "\n" + w.Title
+		label = label + "\n" + title
 		if titles := resolveMeasureTitles(w.Measures, d, reg); titles != "" {
 			label = label + "\n" + titles
+		}
+		if len(w.Series) > 0 {
+			var bits []string
+			for _, s := range w.Series {
+				bit := s.Name
+				if s.Type != "" {
+					bit = s.Type + ":" + bit
+				}
+				if s.Axis != "" {
+					bit = bit + "(" + s.Axis + ")"
+				}
+				bits = append(bits, bit)
+			}
+			label = label + "\n" + strings.Join(bits, ", ")
 		}
 		f.Elements = append(f.Elements, Element{
 			ID:              "widget-" + w.ID,
 			Type:            "rectangle",
 			X:               40 + w.Layout.X*colW,
-			Y:               160 + w.Layout.Y*rowH,
+			Y:               200 + w.Layout.Y*rowH,
 			Width:           w.Layout.W * colW,
 			Height:          w.Layout.H * rowH,
 			StrokeColor:     color,
@@ -166,6 +213,8 @@ func chartColor(t string) string {
 		return "#e8590c"
 	case "stacked_bar":
 		return "#1971c2"
+	case "combo":
+		return "#9c36b5"
 	default:
 		return "#495057"
 	}
@@ -179,6 +228,8 @@ func lighten(c string) string {
 		return "#fff4e6"
 	case "#1971c2":
 		return "#e7f5ff"
+	case "#9c36b5":
+		return "#f3d9fa"
 	default:
 		return "#f8f9fa"
 	}
