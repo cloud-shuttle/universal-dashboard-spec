@@ -79,9 +79,9 @@ New widget type.
 
 | Feature            | Schema | Parser | Emitters      |
 |--------------------|--------|--------|---------------|
-| Parameters         | yes    | pending| pending       |
-| Filter controls    | yes    | pending| pending       |
-| Pivot tables       | yes    | pending| pending       |
-| Drill actions      | yes    | pending| pending       |
+| Parameters         | yes    | yes    | pending       |
+| Filter controls    | yes    | yes    | pending       |
+| Pivot tables       | yes    | yes    | pending       |
+| Drill actions      | yes    | yes    | pending       |
 
-These are additive. Existing specs remain valid.
+These are additive. Existing specs remain valid. Parser structs now load all four features; emitters still need to consume them.
