@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cloud-shuttle/universal-dashboard-spec/internal/cube"
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/echarts"
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/excalidraw"
 	"github.com/cloud-shuttle/universal-dashboard-spec/internal/metabase"
@@ -18,7 +19,7 @@ func main() {
 	var (
 		input    = flag.String("in", "", "Path to UDS Dashboard YAML file")
 		models   = flag.String("models", "", "Comma-separated paths to SemanticModel YAML files")
-		target   = flag.String("target", "excalidraw", "Target: excalidraw | metabase | echarts")
+		target   = flag.String("target", "excalidraw", "Target: excalidraw | metabase | echarts | cube")
 		out      = flag.String("out", "", "Output path (directory or file)")
 		strict   = flag.Bool("strict", false, "Treat intent/type mismatches as errors")
 		database = flag.String("database", "", "Override source database (Metabase)")
@@ -93,7 +94,7 @@ func main() {
 			Database: *database,
 			Schema:   *schema,
 			Table:    *table,
-		})
+		}, reg)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -127,6 +128,28 @@ func main() {
 			}
 			fmt.Println("wrote", p)
 		}
+
+	case "cube":
+		if *models == "" {
+			log.Fatal("cube target requires -models pointing at a SemanticModel")
+		}
+		first := strings.Split(*models, ",")[0]
+		m, err := parser.LoadSemanticModel(strings.TrimSpace(first))
+		if err != nil {
+			log.Fatal(err)
+		}
+		data, err := cube.Emit(m)
+		if err != nil {
+			log.Fatal(err)
+		}
+		path := *out
+		if path == "" {
+			path = m.Metadata.Name + ".cube.yaml"
+		}
+		if err := os.WriteFile(path, data, 0644); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("wrote", path)
 
 	default:
 		log.Fatalf("unknown target %q", *target)

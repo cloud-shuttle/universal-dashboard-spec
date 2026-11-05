@@ -22,7 +22,8 @@ type EmitOptions struct {
 // Entity IDs are deterministic (hash of name) so re-runs do not churn.
 // Source table is taken from the UDS spec.source block, then overridden by opts if non-empty.
 // Intent drives additional visualization and query settings (sort, stacking, goal line).
-func Emit(d *parser.Dashboard, opts EmitOptions) (map[string][]byte, error) {
+// If reg is non-nil, qualified measure/dimension names (model.name) are resolved against it.
+func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[string][]byte, error) {
 	files := map[string][]byte{}
 
 	db, schema, table := d.SourceOrDefault(
@@ -43,7 +44,7 @@ func Emit(d *parser.Dashboard, opts EmitOptions) (map[string][]byte, error) {
 			"display":     mapDisplay(w.Type),
 			"type":        "question",
 			"query_type":  "query",
-			"dataset_query": buildMBQL(w, d, db, schema, table),
+			"dataset_query": buildMBQL(w, d, db, schema, table, reg),
 			"visualization_settings": buildVizSettings(w),
 			"serdes/meta": []map[string]string{{
 				"id":    eid,
@@ -90,10 +91,10 @@ func defaultIfEmpty(v, def string) string {
 	return v
 }
 
-func buildMBQL(w parser.Widget, d *parser.Dashboard, db, schema, table string) map[string]any {
+func buildMBQL(w parser.Widget, d *parser.Dashboard, db, schema, table string, reg *parser.Registry) map[string]any {
 	agg := []any{}
 	for _, mName := range w.Measures {
-		m := findMeasure(d, mName)
+		m := findMeasure(d, mName, reg)
 		if m == nil {
 			continue
 		}
@@ -102,7 +103,7 @@ func buildMBQL(w parser.Widget, d *parser.Dashboard, db, schema, table string) m
 
 	breakout := []any{}
 	for _, dimName := range w.Dimensions {
-		dim := findDimension(d, dimName)
+		dim := findDimension(d, dimName, reg)
 		if dim == nil {
 			continue
 		}
@@ -206,7 +207,19 @@ func mapDisplay(t string) string {
 	}
 }
 
-func findMeasure(d *parser.Dashboard, name string) *parser.Measure {
+func findMeasure(d *parser.Dashboard, name string, reg *parser.Registry) *parser.Measure {
+	if reg != nil {
+		parts := strings.SplitN(name, ".", 2)
+		if len(parts) == 2 {
+			if m, ok := reg.Get(parts[0]); ok {
+				for i := range m.Spec.Measures {
+					if m.Spec.Measures[i].Name == parts[1] {
+						return &m.Spec.Measures[i]
+					}
+				}
+			}
+		}
+	}
 	for i := range d.Spec.Measures {
 		if d.Spec.Measures[i].Name == name {
 			return &d.Spec.Measures[i]
@@ -215,7 +228,19 @@ func findMeasure(d *parser.Dashboard, name string) *parser.Measure {
 	return nil
 }
 
-func findDimension(d *parser.Dashboard, name string) *parser.Dimension {
+func findDimension(d *parser.Dashboard, name string, reg *parser.Registry) *parser.Dimension {
+	if reg != nil {
+		parts := strings.SplitN(name, ".", 2)
+		if len(parts) == 2 {
+			if m, ok := reg.Get(parts[0]); ok {
+				for i := range m.Spec.Dimensions {
+					if m.Spec.Dimensions[i].Name == parts[1] {
+						return &m.Spec.Dimensions[i]
+					}
+				}
+			}
+		}
+	}
 	for i := range d.Spec.Dimensions {
 		if d.Spec.Dimensions[i].Name == name {
 			return &d.Spec.Dimensions[i]
