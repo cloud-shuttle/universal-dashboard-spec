@@ -1,0 +1,83 @@
+apiVersion: uds/v1
+kind: Dashboard
+metadata:
+  name: sales-overview
+  title: Sales Overview
+  description: Revenue and pipeline by region and product
+
+spec:
+  measures:
+    - name: revenue
+      title: Revenue
+      aggregation: sum
+      field: amount
+      format: currency
+    - name: deal_count
+      title: Deal Count
+      aggregation: count
+      field: deal_id
+    - name: avg_deal_size
+      title: Average Deal Size
+      aggregation: avg
+      field: amount
+      format: currency
+
+  dimensions:
+    - name: closed_date
+      title: Closed Date
+      field: closed_at
+      type: date
+      temporalGrain: month
+    - name: region
+      title: Region
+      field: region
+      type: string
+    - name: product
+      title: Product
+      field: product_name
+      type: string
+
+  filters:
+    - name: date_range
+      title: Date Range
+      dimension: closed_date
+      required: true
+    - name: region_filter
+      title: Region
+      dimension: region
+
+  tabs:
+    - name: overview
+      title: Overview
+    - name: by_product
+      title: By Product
+
+  widgets:
+    - id: revenue_over_time
+      type: line
+      title: Revenue over Time
+      tab: overview
+      measures: [revenue]
+      dimensions: [closed_date]
+      filters: [date_range, region_filter]
+      layout: { x: 0, y: 0, w: 16, h: 8 }
+      options:
+        goalLine: 500000
+
+    - id: deals_by_region
+      type: bar
+      title: Deals by Region
+      tab: overview
+      measures: [deal_count]
+      dimensions: [region]
+      filters: [date_range]
+      layout: { x: 16, y: 0, w: 8, h: 8 }
+
+    - id: revenue_by_product
+      type: stacked_bar
+      title: Revenue by Product
+      tab: by_product
+      measures: [revenue]
+      dimensions: [product, closed_date]
+      filters: [date_range, region_filter]
+      layout: { x: 0, y: 0, w: 24, h: 10 }
