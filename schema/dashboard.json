@@ -26,6 +26,11 @@
           "items": { "type": "string" },
           "description": "Names of SemanticModels this dashboard references"
         },
+        "parameters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/parameter" },
+          "description": "User-set values that drive calculations or widget options (distinct from filters)"
+        },
         "measures": {
           "type": "array",
           "items": { "$ref": "#/$defs/measure" }
@@ -57,6 +62,20 @@
         "database": { "type": "string" },
         "schema": { "type": "string" },
         "table": { "type": "string" }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string" },
+        "title": { "type": "string" },
+        "type": {
+          "enum": ["string", "number", "date", "boolean", "date_range"]
+        },
+        "default": {},
+        "required": { "type": "boolean" },
+        "description": { "type": "string" }
       }
     },
     "measure": {
@@ -93,6 +112,15 @@
         "name": { "type": "string" },
         "title": { "type": "string" },
         "dimension": { "type": "string" },
+        "control": {
+          "description": "UI control to render for this filter",
+          "enum": ["dropdown", "multi_select", "date_picker", "date_range", "slider", "search"]
+        },
+        "multi": { "type": "boolean" },
+        "cascadeFrom": {
+          "description": "Name of another filter this one depends on",
+          "type": "string"
+        },
         "default": {},
         "required": { "type": "boolean" }
       }
@@ -120,7 +148,8 @@
             "table",
             "number",
             "scatter",
-            "heatmap"
+            "heatmap",
+            "pivot"
           ]
         },
         "intent": {
@@ -141,6 +170,16 @@
         "measures": { "type": "array", "items": { "type": "string" } },
         "dimensions": { "type": "array", "items": { "type": "string" } },
         "filters": { "type": "array", "items": { "type": "string" } },
+        "parameters": {
+          "description": "Parameters this widget consumes",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "actions": {
+          "description": "Drill or navigation actions",
+          "type": "array",
+          "items": { "$ref": "#/$defs/action" }
+        },
         "layout": {
           "type": "object",
           "required": ["x", "y", "w", "h"],
@@ -152,6 +191,20 @@
           }
         },
         "options": { "type": "object" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": ["drill_to_dashboard", "drill_to_card", "url", "filter"]
+        },
+        "target": { "type": "string" },
+        "parameterMappings": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
       }
     }
   }
