@@ -6,6 +6,11 @@ metadata:
   description: Revenue and pipeline by region and product
 
 spec:
+  source:
+    database: Sample Database
+    schema: PUBLIC
+    table: ORDERS
+
   measures:
     - name: revenue
       title: Revenue
