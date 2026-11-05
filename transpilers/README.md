@@ -32,9 +32,11 @@ Each card is an MBQL query. Entity ids are a 21-character hash of the name (Nano
 
 The card table comes from the measure model's `spec.source`, then the dashboard `spec.source`, then `Sample Database` / `PUBLIC` / `ORDERS`. A model that needed one of those defaults prints a warning. `-database` fills every table on the card. `-schema` and `-table` fill the base table.
 
-A second model is a left join when a measure, breakout, pivot field, fixed filter, or measure `where` names it. One side of the shared entity must be `primary`. Two foreign keys fail the card. A dashboard filter does not add a join. If the filter's model is not already on the card, that dashcard leaves the parameter unmapped.
+A second model is a left join when a measure, breakout, pivot field, fixed filter, or measure `where` names it. One side of the shared entity must be `primary`. If every model marks that entity `foreign`, the join fails until one model declares it `primary`. Two foreign keys fail the card. A dashboard filter does not add a join. If the filter's model is not already on the card, that dashcard leaves the parameter unmapped and warns.
 
-`simple` and `ltm` metrics compile to the named measure (`ltm` as an `offset` window of the breakout grain). `ratio` compiles to numerator `/` denominator. `derived` compiles to its expression. `cumulative` is skipped, with a warning. An unknown measure name is skipped, with a warning.
+`simple` and `ltm` metrics compile to the named measure (`ltm` as an `offset` window of the breakout grain). `ratio` compiles to numerator `/` denominator, with no zero-denominator guard. `derived` compiles to its expression. `cumulative` is skipped, with a warning. An unknown measure name is skipped, with a warning.
+
+Series `type`, `axis`, and `color` are written as `series_settings`. A parameter with `swaps` is emitted as a control and does not change the card query; the emitter warns. Widget `actions` are not emitted, and the emitter warns.
 
 `titleTemplate` on a tab or a widget substitutes `{{parameter}}` from the parameter `default` into the tab name and the card `name`. The raw template is also stored as the tab's `title_template`. Widget `parameters` only feed that substitution. An MBQL card has no template tags.
 

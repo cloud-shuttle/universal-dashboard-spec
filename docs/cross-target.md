@@ -7,7 +7,8 @@ Metabase, ECharts, Excalidraw, and Cube have emitters. The Lightdash and Grafana
 | Temporal grain       | field + unit      | timeInterval  | interval       | custom      | label only |
 | Goal line            | viz settings      | reference line| threshold      | markLine    | not shown  |
 | Tabs                 | native            | native        | TabsLayout     | not emitted | tab headers |
-| Filter wiring        | field target; unmapped when that model is not in the query | dashboard filter | variable     | external    | label, no arrows |
+| Filter wiring        | field target; unmapped, with a warning, when that model is not in the query | dashboard filter | variable     | external    | label, no arrows |
+| Series type / axis   | `series_settings` | not implemented | not implemented | series type and `yAxisIndex` | label |
 | Stable IDs           | hash, NanoID alphabet | file names | panel ids   | n/a         | element ids|
 | Measure `where`      | `*-where` agg     | query filter  | SQL `WHERE`    | external    | not shown  |
 | Measure expression   | MBQL arithmetic   | SQL expr      | SQL expr       | external    | not shown  |

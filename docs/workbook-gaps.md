@@ -148,7 +148,7 @@ Query structure is in the schema. These presentation and interaction details are
 | Parameters + values + swaps   | yes    | yes    | partial          |
 | Radio + filter values         | yes    | yes    | yes              |
 | Dynamic titles                | yes    | yes    | yes              |
-| Combo series type/axis        | yes    | yes    | partial          |
+| Combo series type/axis        | yes    | yes    | `series_settings` display, axis, and colour |
 | Series colours                | yes    | yes    | yes              |
 | Pivot formatting              | yes    | yes    | column split, totals, colours; brackets recorded |
 | LTM (dashboard + semantic)    | yes    | yes    | trailing window via `offset` |
@@ -156,7 +156,7 @@ Query structure is in the schema. These presentation and interaction details are
 | Measure `where`               | yes    | yes    | `sum-where` / `count-where` / `distinct-where` |
 | Measure `expression`          | yes    | yes    | MBQL `+ - * /`   |
 | Semantic `number` dimension   | yes    | yes    | —                |
-| Filter `bindings`             | yes    | yes    | one parameter, per-card mapping |
+| Filter `bindings`             | yes    | yes    | one parameter, per-card mapping; skipped bindings warn |
 | Filter `searchable`           | yes    | yes    | passed on the parameter |
 | Widget `timeGrain`            | yes    | yes    | `temporal-unit`  |
 | Tab `titleTemplate`           | yes    | yes    | tab and card name, `{{param}}` from the parameter default |
@@ -169,7 +169,7 @@ Query structure is in the schema. These presentation and interaction details are
 | Model source                  | yes    | yes    | model table, else dashboard source, else Sample Database / PUBLIC / ORDERS, with a warning |
 | Model join                    | yes    | yes    | left join only for a query field; one side must be `primary`; a filter does not join |
 | `-database` / `-schema` / `-table` | — | — | `-database` on every table; `-schema` and `-table` on the base table |
-| Widget `actions`              | yes    | yes    | not emitted |
-| Parameter `swaps`             | yes    | yes    | stored on the parameter; the card measure is not swapped |
+| Widget `actions`              | yes    | yes    | not emitted, with a warning |
+| Parameter `swaps`             | yes    | yes    | stored on the parameter; the card measure is not swapped, with a warning |
 
 These are additive. Existing specs remain valid. Lightdash and Grafana have no emitter. ECharts, Excalidraw, and Cube coverage is in [targets.md](targets.md) and [cross-target.md](cross-target.md).

@@ -290,6 +290,7 @@ func lookupMeasure(d *parser.Dashboard, name string, reg *parser.Registry) (*par
 		}
 		switch met.Type {
 		case "ratio":
+			// ponytail: raw division. A zero denominator is left to Metabase; guard it when a consumer confirms the null they want.
 			return &parser.Measure{Name: met.Name, Title: met.Title, Expression: met.Numerator + " / " + met.Denominator}, model
 		case "derived":
 			return &parser.Measure{Name: met.Name, Title: met.Title, Expression: met.Expression}, model

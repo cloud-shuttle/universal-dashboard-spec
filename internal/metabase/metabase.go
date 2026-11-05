@@ -94,6 +94,9 @@ func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[stri
 	if tabs := buildTabs(d); len(tabs) > 0 {
 		dash["tabs"] = tabs
 	}
+	for _, msg := range lossWarnings(d) {
+		fmt.Fprintf(os.Stderr, "warning: %s\n", msg)
+	}
 
 	b, err := marshalDoc(dash)
 	if err != nil {
@@ -124,16 +127,39 @@ func buildVizSettings(w parser.Widget, d *parser.Dashboard, reg *parser.Registry
 		vs["graph.metrics"] = metrics
 	}
 
-	// series colours
+	// series_settings carries per-series display, axis, and colour.
+	// graph.colors keeps the same colour list for readers that only look there.
 	if len(w.Series) > 0 {
 		colors := []string{}
+		settings := map[string]any{}
+		autoSplit := false
 		for _, s := range w.Series {
+			one := map[string]any{}
 			if s.Color != "" {
 				colors = append(colors, s.Color)
+				one["color"] = s.Color
+			}
+			if s.Type != "" {
+				one["display"] = s.Type
+			}
+			if s.Axis != "" {
+				one["axis"] = s.Axis
+				if s.Axis == "right" {
+					autoSplit = true
+				}
+			}
+			if len(one) > 0 {
+				settings[shortName(s.Name)] = one
 			}
 		}
 		if len(colors) > 0 {
 			vs["graph.colors"] = colors
+		}
+		if len(settings) > 0 {
+			vs["series_settings"] = settings
+		}
+		if autoSplit {
+			vs["graph.y_axis.auto_split"] = true
 		}
 	}
 
@@ -241,7 +267,10 @@ func buildDashcards(d *parser.Dashboard, cardIDs map[string]string, sources map[
 			cards = append(cards, card)
 			continue
 		}
-		mappings := buildParameterMappings(d, w, sources[w.ID], reg)
+		mappings, warns := buildParameterMappings(d, w, sources[w.ID], reg)
+		for _, msg := range warns {
+			fmt.Fprintf(os.Stderr, "warning: %s\n", msg)
+		}
 		card := map[string]any{
 			"id":                 i + 1,
 			"card_id":            cardIDs[w.ID],
@@ -262,18 +291,21 @@ func buildDashcards(d *parser.Dashboard, cardIDs map[string]string, sources map[
 
 // buildParameterMappings wires each filter on the widget to a field on the card.
 // Widget parameters only substitute title templates. An MBQL card has no template tags.
-func buildParameterMappings(d *parser.Dashboard, w parser.Widget, src cardSource, reg *parser.Registry) []map[string]any {
+func buildParameterMappings(d *parser.Dashboard, w parser.Widget, src cardSource, reg *parser.Registry) ([]map[string]any, []string) {
 	var mappings []map[string]any
+	var warnings []string
 
 	for _, filterName := range w.Filters {
 		f := findFilter(d, filterName)
 		if f == nil {
+			warnings = append(warnings, fmt.Sprintf("widget %q: filter %q is not declared, mapping skipped", w.ID, filterName))
 			continue
 		}
 		binding := filterBindingForWidget(*f, w)
 		model, _, qualified := splitRef(binding)
 		if qualified && model != src.base {
 			if _, ok := src.joined[model]; !ok {
+				warnings = append(warnings, fmt.Sprintf("widget %q: filter %q binding %q is not on this card, mapping skipped", w.ID, f.Name, binding))
 				continue
 			}
 		}
@@ -287,7 +319,25 @@ func buildParameterMappings(d *parser.Dashboard, w parser.Widget, src cardSource
 		})
 	}
 
-	return mappings
+	return mappings, warnings
+}
+
+// lossWarnings reports query behaviour the Metabase emitter does not carry.
+// Parameter swaps stay on the control. The card keeps the measures written on
+// the widget. Drill actions have no dashcard click behaviour yet.
+func lossWarnings(d *parser.Dashboard) []string {
+	var out []string
+	for _, p := range d.Spec.Parameters {
+		if len(p.Swaps) > 0 {
+			out = append(out, fmt.Sprintf("parameter %q swaps are not applied to the query; cards keep their listed measures", p.Name))
+		}
+	}
+	for _, w := range d.Spec.Widgets {
+		for _, a := range w.Actions {
+			out = append(out, fmt.Sprintf("widget %q: action %q is not emitted", w.ID, a.Type))
+		}
+	}
+	return out
 }
 
 func mapDisplay(t string) string {

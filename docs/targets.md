@@ -9,18 +9,18 @@ Output is one card YAML per analytical widget and one dashboard YAML, under `col
 - The query is MBQL. Measures are inlined as aggregations. `where` on `sum`, `count`, and `count_distinct` becomes `sum-where`, `count-where`, or `distinct-where`. `avg`, `min`, and `max` have no `*-where` form, so the predicate is a query filter only when the card has one measure.
 - An expression is MBQL `+ - * /`. `where` on an expression applies to every measure it uses.
 - `graph.dimensions` uses each dimension's `field`. `graph.metrics` uses the short measure name. `ranking` adds `order-by` descending on the first aggregation. `part_to_whole` and `stacked_bar` set `graph.stacking`. `options.goalLine` sets `graph.goal_value`.
-- Series `color` becomes `graph.colors`. Series `type` and `axis` are not written on the Metabase card.
+- Series `color`, `type`, and `axis` become `series_settings` (`display`, `axis`, `color`). Colours are also written as `graph.colors`. A `right` axis sets `graph.y_axis.auto_split`. `tooltipFields` are not written.
 - A pivot writes `pivot_table.column_split`. A measure stays in the `rows` or `columns` bucket where it is listed. `boldTotals` sets `pivot.show_row_totals` and `pivot.show_column_totals`. `conditionalColors` becomes `table.column_formatting`. `negatives: brackets` records `negative_in_parentheses` per measure. Metabase's formatter still prints a leading minus.
 - `ltm` is an `offset` window of the breakout grain: 12 months, 4 quarters, 52 weeks, 365 days, or one sum for a year.
-- Semantic metrics: `simple` is the named measure, `ltm` is that window, `ratio` is numerator `/` denominator, `derived` is its expression. `cumulative` is skipped and a warning is printed.
+- Semantic metrics: `simple` is the named measure, `ltm` is that window, `ratio` is numerator `/` denominator, `derived` is its expression. The division is not guarded. A zero denominator is left to Metabase. `cumulative` is skipped and a warning is printed.
 - The card table is the measure model's `source`, then the dashboard `source`, then `Sample Database` / `PUBLIC` / `ORDERS`. A model that needed a default prints a warning. `-database` sets the database on the base table and every join. `-schema` and `-table` set the base table only.
-- A second model is a left join when a query field needs it (measure, breakout, pivot field, fixed filter, or measure `where`). One side of the shared entity must be `primary`. Two foreign keys fail the card. A filter binding does not add a join. A filter whose model is not on the card is left unmapped. The mapping target is a field ref, including `join-alias` when the field's model was joined.
+- A second model is a left join when a query field needs it (measure, breakout, pivot field, fixed filter, or measure `where`). One side of the shared entity must be `primary`. If every model marks that entity `foreign`, the first widget that uses a field from a second model fails until one model declares it `primary`. Two foreign keys fail the card. A filter binding does not add a join. A filter whose model is not on the card is left unmapped, and the emitter warns with the widget, the filter, and the binding. The mapping target is a field ref, including `join-alias` when the field's model was joined.
 - Filters and UDS parameters become dashboard parameters. `searchable`, static `values`, and `bindings` are passed through. Radio and multi-select use `string/=`. Date controls use `date/range` or `date/single`.
 - `titleTemplate` substitutes `{{parameter}}` from the parameter `default` into the tab name and the card name. The tab also keeps the raw string as `title_template`. Widget `parameters` do not become template tags.
 - `fixedFilters` are the query `filter`. `timeGrain` sets `temporal-unit` on the time breakout.
 - `text` and `image` are virtual text cards on the dashboard. An image card's body is `src`. Layout is `col` / `row` / `size_x` / `size_y`.
 - Unsafe YAML scalars (`=`, `-`, `/`, and the rest of that set) are double-quoted.
-- Not emitted: widget `actions`, parameter `swaps` as a measure change, series `type` and `axis`, `cumulative` metrics.
+- Not emitted, with a warning: widget `actions` (drill links have no dashcard click behaviour), and parameter `swaps` (Top N, a comparative period, or a measure switch stays on the control; each card keeps the measures written on it). `cumulative` metrics are skipped, with a warning.
 
 ## Cube (implemented)
 

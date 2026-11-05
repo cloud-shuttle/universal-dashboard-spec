@@ -2,7 +2,7 @@
 
 **Status: experimental.** The schema and the `uds` CLI compile a dashboard to Metabase, ECharts, and Excalidraw, and a SemanticModel to Cube. The format can still change. Pin to a commit if you depend on it.
 
-Lightdash and Grafana are described as targets. This repo has no emitter for them. Drill actions (`actions` on a widget) are in the schema and are not emitted. A `cumulative` metric is accepted by the schema and is not compiled.
+Lightdash and Grafana are described as targets. This repo has no emitter for them. Drill actions (`actions` on a widget) and parameter `swaps` are in the schema. Metabase does not apply them to the query, and the emitter warns. A filter whose model is not on a card is left unmapped, with a warning. A `cumulative` metric is accepted by the schema and is not compiled.
 
 A thin, LLM-friendly YAML language for describing dashboards once, then compiling that description to multiple targets.
 

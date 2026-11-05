@@ -200,6 +200,49 @@ func TestFilterBindingDoesNotJoin(t *testing.T) {
 	if strings.Contains(dash, "join-alias") || strings.Contains(dash, "region_name") {
 		t.Fatalf("unmapped filter still targeted the other model\n%s", dash)
 	}
+	src, err := resolveCardSource(d.Spec.Widgets[0], d, EmitOptions{}, reg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mappings, warns := buildParameterMappings(d, d.Spec.Widgets[0], src, reg)
+	if len(mappings) != 0 || len(warns) != 1 || !strings.Contains(warns[0], `filter "region"`) || !strings.Contains(warns[0], "customers.region") || !strings.Contains(warns[0], "mapping skipped") {
+		t.Fatalf("mappings %#v warnings %#v", mappings, warns)
+	}
+}
+
+func TestComboSeriesSettingsAndLossWarnings(t *testing.T) {
+	w := parser.Widget{
+		ID: "mix", Type: "combo", Title: "Mix",
+		Measures: []string{"revenue", "margin"},
+		Series: []parser.Series{
+			{Name: "orders.revenue", Type: "bar", Axis: "left", Color: "#111111"},
+			{Name: "margin", Type: "line", Axis: "right", Color: "#222222"},
+		},
+		Actions: []parser.Action{{Type: "drill_to_dashboard", Target: "detail"}},
+		Layout:  parser.Layout{W: 8, H: 4},
+	}
+	vs := buildVizSettings(w, &parser.Dashboard{}, nil)
+	settings, ok := vs["series_settings"].(map[string]any)
+	if !ok {
+		t.Fatalf("series_settings = %#v", vs["series_settings"])
+	}
+	bar, _ := settings["revenue"].(map[string]any)
+	line, _ := settings["margin"].(map[string]any)
+	if bar["display"] != "bar" || bar["axis"] != "left" || line["display"] != "line" || line["axis"] != "right" || vs["graph.y_axis.auto_split"] != true {
+		t.Fatalf("settings %#v", settings)
+	}
+	d := &parser.Dashboard{Spec: parser.Spec{
+		Parameters: []parser.Parameter{{
+			Name: "view", Type: "string", Default: "Monthly",
+			Swaps: map[string]string{"Monthly": "revenue", "LTM": "revenue_ltm"},
+		}},
+		Widgets: []parser.Widget{w},
+	}}
+	warns := lossWarnings(d)
+	joined := strings.Join(warns, "\n")
+	if len(warns) != 2 || !strings.Contains(joined, `parameter "view" swaps`) || !strings.Contains(joined, `widget "mix": action "drill_to_dashboard"`) {
+		t.Fatalf("warnings %#v", warns)
+	}
 }
 
 func TestJoinRefusesForeignForeign(t *testing.T) {
