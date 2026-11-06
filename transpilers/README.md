@@ -34,7 +34,9 @@ The card table comes from the measure model's `spec.source`, then the dashboard 
 
 A second model is a left join when a measure, breakout, pivot field, fixed filter, or measure `where` names it. One side of the shared entity must be `primary`. If every model marks that entity `foreign`, the join fails until one model declares it `primary`. Two foreign keys fail the card. A dashboard filter does not add a join. If the filter's model is not already on the card, that dashcard leaves the parameter unmapped and warns.
 
-`simple` and `ltm` metrics compile to the named measure (`ltm` as an `offset` window of the breakout grain). `ratio` compiles to numerator `/` denominator, with no zero-denominator guard. `derived` compiles to its expression. `cumulative` is skipped, with a warning. An unknown measure name is skipped, with a warning.
+`simple` and `ltm` metrics compile to the named measure (`ltm` as an `offset` window of the breakout grain). `ratio` compiles to numerator `/` denominator. A zero denominator is null. `derived` compiles to its expression. `priorPeriod` is one `offset`. `cumulative` is skipped, with a warning. An unknown measure name is skipped, with a warning.
+
+`source.function` is a native `source-query`. Arguments keep YAML map order and become template tags, so the named parameter or filter changes the call. `map` is a SQL `CASE`. The same model warning is printed once. `visibleWhen` is not a Metabase visibility rule. The emitter warns, and Excalidraw puts the condition on the label. `tooltipFields` are `graph.tooltip_columns`.
 
 Series `type`, `axis`, and `color` are written as `series_settings`. A parameter with `swaps` is emitted as a control and does not change the card query; the emitter warns. Widget `actions` are not emitted, and the emitter warns.
 

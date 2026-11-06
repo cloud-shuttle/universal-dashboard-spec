@@ -70,9 +70,11 @@ type Spec struct {
 }
 
 type Source struct {
-	Database string `yaml:"database,omitempty"`
-	Schema   string `yaml:"schema,omitempty"`
-	Table    string `yaml:"table,omitempty"`
+	Database  string    `yaml:"database,omitempty"`
+	Schema    string    `yaml:"schema,omitempty"`
+	Table     string    `yaml:"table,omitempty"`
+	Function  string    `yaml:"function,omitempty"`
+	Arguments Arguments `yaml:"arguments,omitempty"`
 }
 
 type Parameter struct {
@@ -102,14 +104,15 @@ type PivotField struct {
 }
 
 type Measure struct {
-	Name        string      `yaml:"name"`
-	Title       string      `yaml:"title,omitempty"`
-	Aggregation string      `yaml:"aggregation,omitempty"`
-	Expression  string      `yaml:"expression,omitempty"`
-	Field       string      `yaml:"field,omitempty"`
-	Format      string      `yaml:"format,omitempty"`
-	Description string      `yaml:"description,omitempty"`
-	Where       []Predicate `yaml:"where,omitempty"`
+	Name        string       `yaml:"name"`
+	Title       string       `yaml:"title,omitempty"`
+	Aggregation string       `yaml:"aggregation,omitempty"`
+	Expression  string       `yaml:"expression,omitempty"`
+	Field       string       `yaml:"field,omitempty"`
+	Format      string       `yaml:"format,omitempty"`
+	Description string       `yaml:"description,omitempty"`
+	Where       []Predicate  `yaml:"where,omitempty"`
+	PriorPeriod *PriorPeriod `yaml:"priorPeriod,omitempty"`
 }
 
 type Dimension struct {
@@ -159,6 +162,7 @@ type Widget struct {
 	Parameters    []string       `yaml:"parameters,omitempty"`
 	Actions       []Action       `yaml:"actions,omitempty"`
 	Series        []Series       `yaml:"series,omitempty"`
+	VisibleWhen   *VisibleWhen   `yaml:"visibleWhen,omitempty"`
 	Layout        Layout         `yaml:"layout"`
 	Options       map[string]any `yaml:"options,omitempty"`
 }

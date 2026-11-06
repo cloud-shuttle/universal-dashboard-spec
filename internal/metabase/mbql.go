@@ -19,6 +19,9 @@ func buildMBQL(w parser.Widget, d *parser.Dashboard, src cardSource, reg *parser
 			fmt.Fprintf(os.Stderr, "warning: widget %q: measure %q not found, skipped\n", w.ID, mName)
 			continue
 		}
+		if m.PriorPeriod != nil && !breakoutHas(w, m.PriorPeriod.Dimension) {
+			fmt.Fprintf(os.Stderr, "warning: widget %q: measure %q priorPeriod dimension %q is not a breakout\n", w.ID, m.Name, m.PriorPeriod.Dimension)
+		}
 		item, fallback := measureAgg(m, d, src, reg, map[string]bool{}, cardGrain(w, d, reg), nil, model)
 		agg = append(agg, item)
 		if len(fallback) > 0 && fallbackModel == "" {
@@ -66,12 +69,16 @@ func buildMBQL(w parser.Widget, d *parser.Dashboard, src cardSource, reg *parser
 	}
 
 	query := map[string]any{
-		"source-table": []any{src.db, src.schema, src.table},
-		"aggregation":  agg,
-		"breakout":     breakout,
+		"aggregation": agg,
+		"breakout":    breakout,
 	}
-	if joins := src.joinClauses(); len(joins) > 0 {
-		query["joins"] = joins
+	if src.function != "" {
+		query["source-query"] = nativeSource(src, d)
+	} else {
+		query["source-table"] = []any{src.db, src.schema, src.table}
+		if joins := src.joinClauses(); len(joins) > 0 {
+			query["joins"] = joins
+		}
 	}
 
 	var filters []any
@@ -143,6 +150,9 @@ func measureAgg(m *parser.Measure, d *parser.Dashboard, src cardSource, reg *par
 		fieldName = m.Name
 	}
 	field := src.field(model, fieldName, nil)
+	if m.PriorPeriod != nil {
+		return priorAgg(m.Name, aggName, field, wheres, m.PriorPeriod.Offset, d, src, reg, model), nil
+	}
 	if aggName == "ltm" {
 		return ltmAgg(m.Name, field, wheres, grain, d, src, reg, model), nil
 	}
@@ -176,6 +186,12 @@ func nameAgg(name string, item any) any {
 	parts, ok := item.([]any)
 	if !ok || name == "" || len(parts) == 0 {
 		return item
+	}
+	if parts[0] == "case" {
+		if opts, ok := parts[len(parts)-1].(map[string]any); ok {
+			opts["name"] = name
+			return parts
+		}
 	}
 	if len(parts) > 1 {
 		if _, ok := parts[1].(map[string]any); ok {
@@ -224,12 +240,48 @@ func compileExpr(e *parser.Expr, d *parser.Dashboard, src cardSource, reg *parse
 	case e.Op == "neg":
 		return []any{"-", compileExpr(e.Left, d, src, reg, visiting, grain, inherit, model)}
 	default:
-		return []any{
-			e.Op,
-			compileExpr(e.Left, d, src, reg, visiting, grain, inherit, model),
-			compileExpr(e.Right, d, src, reg, visiting, grain, inherit, model),
+		left := compileExpr(e.Left, d, src, reg, visiting, grain, inherit, model)
+		right := compileExpr(e.Right, d, src, reg, visiting, grain, inherit, model)
+		if e.Op == "/" {
+			// A zero denominator is undefined, so the rate is null rather than 0.
+			return []any{
+				"case",
+				[]any{[]any{[]any{"=", right, 0}, nil}},
+				map[string]any{"default": []any{"/", left, right}},
+			}
+		}
+		return []any{e.Op, left, right}
+	}
+}
+
+func breakoutHas(w parser.Widget, dimension string) bool {
+	for _, name := range w.Dimensions {
+		if name == dimension || shortName(name) == dimension {
+			return true
 		}
 	}
+	for _, item := range append(append([]parser.PivotField{}, w.Rows...), w.Columns...) {
+		if item.Dimension == dimension || shortName(item.Dimension) == dimension {
+			return true
+		}
+	}
+	return false
+}
+
+func priorAgg(name, aggName string, field any, wheres []parser.Predicate, offset int, d *parser.Dashboard, src cardSource, reg *parser.Registry, model string) any {
+	base := []any{aggName, field}
+	if len(wheres) > 0 {
+		clause := predicatesMBQL(wheres, d, src, reg, model)
+		// ponytail: avg/min/max have no *-where, so a priorPeriod of those drops the where. Add when a spec needs it.
+		switch aggName {
+		case "sum", "count", "count_distinct":
+			base = []any{aggName + "-where", field, clause}
+		}
+	}
+	if offset == 0 {
+		return append([]any{base[0], named(name)}, base[1:]...)
+	}
+	return []any{"offset", named(name), base, offset}
 }
 
 // ltmAgg is a trailing window of the breakout grain that adds up to twelve

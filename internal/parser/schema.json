@@ -61,7 +61,24 @@
       "properties": {
         "database": { "type": "string" },
         "schema": { "type": "string" },
-        "table": { "type": "string" }
+        "table": { "type": "string" },
+        "function": {
+          "type": "string",
+          "description": "Table function, optionally schema-qualified. Arguments are passed in map order."
+        },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/sourceArgument" }
+        }
+      }
+    },
+    "sourceArgument": {
+      "type": "object",
+      "properties": {
+        "parameter": { "type": "string" },
+        "filter": { "type": "string" },
+        "default": {},
+        "map": { "type": "object", "additionalProperties": true }
       }
     },
     "parameter": {
@@ -134,7 +151,17 @@
           "type": "array",
           "description": "Row predicates. On an aggregation they limit the summed rows. On an expression they apply to every measure the expression uses.",
           "items": { "$ref": "#/$defs/predicate" }
-        }
+        },
+        "priorPeriod": { "$ref": "#/$defs/priorPeriod" }
+      }
+    },
+    "priorPeriod": {
+      "type": "object",
+      "required": ["dimension", "offset"],
+      "description": "The same aggregation shifted along a breakout. offset -1 is the previous period. The widget must break out by the dimension.",
+      "properties": {
+        "dimension": { "type": "string" },
+        "offset": { "type": "integer" }
       }
     },
     "dimension": {
@@ -285,6 +312,10 @@
           "type": "array",
           "items": { "$ref": "#/$defs/series" }
         },
+        "visibleWhen": {
+          "description": "Show this widget only when a parameter has this value.",
+          "$ref": "#/$defs/visibleWhen"
+        },
         "layout": {
           "type": "object",
           "required": ["x", "y", "w", "h"],
@@ -317,6 +348,14 @@
           "type": "array",
           "items": { "type": "string" }
         }
+      }
+    },
+    "visibleWhen": {
+      "type": "object",
+      "required": ["parameter", "equals"],
+      "properties": {
+        "parameter": { "type": "string" },
+        "equals": { "description": "The parameter value that shows the widget." }
       }
     },
     "action": {

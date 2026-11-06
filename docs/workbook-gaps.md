@@ -164,7 +164,11 @@ Query structure is in the schema. These presentation and interaction details are
 | Widget `fixedFilters`         | yes    | yes    | query `filter`   |
 | Pivot `rows` / `columns`      | yes    | yes    | measures stay in the listed bucket |
 | Semantic metric `simple` / `ltm` | yes | yes  | the measure, or an `offset` window |
-| Semantic metric `ratio` / `derived` | yes | yes | MBQL expression |
+| Semantic metric `ratio` / `derived` | yes | yes | MBQL expression; division by zero is null |
+| Measure `priorPeriod`        | yes    | yes    | one `offset` along the named breakout |
+| Source `function`             | yes    | yes    | native `source-query` and template tags, in argument order |
+| Widget `visibleWhen`          | yes    | yes    | Excalidraw label; Metabase warns and always shows the card |
+| Series `tooltipFields`        | yes    | yes    | `graph.tooltip_columns` |
 | Semantic metric `cumulative`  | yes    | yes    | skipped, with a warning |
 | Model source                  | yes    | yes    | model table, else dashboard source, else Sample Database / PUBLIC / ORDERS, with a warning |
 | Model join                    | yes    | yes    | left join only for a query field; one side must be `primary`; a filter does not join |

@@ -130,6 +130,9 @@ func Emit(d *parser.Dashboard, reg *parser.Registry) ([]byte, error) {
 		if w.TimeGrain != "" {
 			label = label + "\n" + w.TimeGrain
 		}
+		if w.VisibleWhen != nil && w.VisibleWhen.Parameter != "" {
+			label = label + "\nvisible when " + w.VisibleWhen.Parameter + " = " + fmt.Sprint(w.VisibleWhen.Equals)
+		}
 		if titles := resolveMeasureTitles(w.Measures, d, reg); titles != "" {
 			label = label + "\n" + titles
 		}

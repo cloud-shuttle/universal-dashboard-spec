@@ -11,6 +11,8 @@ import (
 // other semantic model the card references.
 type cardSource struct {
 	db, schema, table string
+	function          string
+	arguments         parser.Arguments
 	base              string
 	joins             []mbqlJoin
 	joined            map[string]mbqlJoin
@@ -30,14 +32,22 @@ func resolveCardSource(w parser.Widget, d *parser.Dashboard, opts EmitOptions, r
 		joined: map[string]mbqlJoin{},
 	}
 	var warns []string
-	src.db, src.schema, src.table, warns = tableOf(modelByName(reg, base), d, opts, true)
+	baseModel := modelByName(reg, base)
+	src.db, src.schema, src.table, warns = tableOf(baseModel, d, opts, true)
+	if baseModel != nil && baseModel.Spec.Source != nil && baseModel.Spec.Source.Function != "" {
+		src.function = baseModel.Spec.Source.Function
+		src.arguments = baseModel.Spec.Source.Arguments
+		warns = dropTableWarnings(warns)
+	}
 	src.warnings = append(src.warnings, warns...)
+	if src.function != "" && len(others) > 0 {
+		return cardSource{}, fmt.Errorf("cannot join onto function source %q", src.function)
+	}
 	for _, name := range others {
 		other := modelByName(reg, name)
 		if other == nil {
 			continue
 		}
-		baseModel := modelByName(reg, base)
 		if baseModel == nil {
 			return cardSource{}, fmt.Errorf("dimension from %q needs a join, and the card has no model to join from", name)
 		}
@@ -54,7 +64,25 @@ func resolveCardSource(w parser.Widget, d *parser.Dashboard, opts EmitOptions, r
 	return src, nil
 }
 
+func dropTableWarnings(in []string) []string {
+	var out []string
+	for _, msg := range in {
+		if strings.Contains(msg, "has no table") {
+			continue
+		}
+		out = append(out, msg)
+	}
+	return out
+}
+
 func (s cardSource) field(model, field string, extra map[string]any) []any {
+	if s.function != "" && (model == "" || model == s.base) {
+		opts := map[string]any{"base-type": "type/*"}
+		for k, v := range extra {
+			opts[k] = v
+		}
+		return []any{"field", field, opts}
+	}
 	db, schema, table := s.db, s.schema, s.table
 	opts := map[string]any{}
 	if model != "" && model != s.base {
@@ -290,7 +318,6 @@ func lookupMeasure(d *parser.Dashboard, name string, reg *parser.Registry) (*par
 		}
 		switch met.Type {
 		case "ratio":
-			// ponytail: raw division. A zero denominator is left to Metabase; guard it when a consumer confirms the null they want.
 			return &parser.Measure{Name: met.Name, Title: met.Title, Expression: met.Numerator + " / " + met.Denominator}, model
 		case "derived":
 			return &parser.Measure{Name: met.Name, Title: met.Title, Expression: met.Expression}, model

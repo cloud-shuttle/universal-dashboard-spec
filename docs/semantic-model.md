@@ -72,7 +72,7 @@ spec:
 - **metrics** — business metrics built from measures. Supported types in v1:
   - `simple` — the named measure. Metabase emits that measure.
   - `ltm` — a trailing window of the named measure. Metabase emits the same `offset` window as a measure `ltm`. Cube does not emit metric `ltm`. A measure with `aggregation: ltm` is what Cube turns into a 12-month `rolling_window`.
-  - `ratio` — numerator / denominator. Metabase emits MBQL `/` with no zero-denominator guard. Cube emits `{numerator} / {denominator}`.
+  - `ratio` — numerator / denominator. Metabase emits MBQL `/`. A zero denominator is null. Cube emits `{numerator} / {denominator}`.
   - `derived` — an expression over measures or other metrics, same vocabulary as a measure expression. Metabase emits MBQL `+ - * /`. Cube does not emit it.
   - `cumulative` — running total or grain-to-date (`input_metric`, `grain_to_date`). The schema accepts it. Metabase skips it and prints a warning. Cube does not emit it.
 
@@ -98,7 +98,19 @@ spec:
 
 Qualified names (`model.measure`) are resolved against loaded SemanticModels. Unqualified names still work for inline definitions.
 
-Metabase uses the source table of the model that owns the card's first measure. A second model is joined only when a query field needs it (a breakout, pivot field, fixed filter, or measure `where`). One side of the shared entity must be a primary key. A dashboard filter does not add a join, and a filter whose model is not in the query is left unmapped. A model with no source, database, or table is filled from the dashboard source, then `Sample Database` / `PUBLIC` / `ORDERS`, and the emitter warns. `-database` sets the database on the base table and on every join. `-models` on a directory loads `kind: SemanticModel` files and skips a dashboard that sits in the same folder.
+Metabase uses the source table of the model that owns the card's first measure. A second model is joined only when a query field needs it (a breakout, pivot field, fixed filter, or measure `where`). One side of the shared entity must be a primary key. A dashboard filter does not add a join, and a filter whose model is not in the query is left unmapped, with a warning. A model with no source, database, or table is filled from the dashboard source, then `Sample Database` / `PUBLIC` / `ORDERS`, and the emitter warns once per distinct message. `-database` sets the database on the base table and on every join. `-models` on a directory loads `kind: SemanticModel` files and skips a dashboard that sits in the same folder.
+
+A source may be a table function. Arguments are a YAML map, called in the order written. Each argument names a `parameter` or a `filter`, with an optional `default` and a `map` from the control's value to the literal the function receives. Metabase emits `SELECT * FROM function(...)` as the card's `source-query`, and maps those controls to template tags. A filter that is a function argument is not dropped. A function source is not joined to another model.
+
+```yaml
+source:
+  function: analytics.orders_for
+  arguments:
+    p_window: { parameter: compare, map: { year: 12, quarter: 3 } }
+    p_region: { filter: region, default: All }
+```
+
+`priorPeriod` shifts an aggregation along a breakout. `offset: -1` is the previous period. The widget has to break out by that dimension. Metabase emits one `offset`, the same operator LTM uses for its window. A ratio or any division whose denominator is zero emits null.
 
 ## Compilation targets
 

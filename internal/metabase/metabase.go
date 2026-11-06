@@ -30,6 +30,7 @@ func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[stri
 
 	cardIDs := map[string]string{} // widget ID → entity ID
 	sources := map[string]cardSource{}
+	var sourceWarns []string
 
 	for _, w := range d.Spec.Widgets {
 		if w.Type == "text" || w.Type == "image" {
@@ -39,9 +40,7 @@ func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[stri
 		if err != nil {
 			return nil, fmt.Errorf("widget %s: %w", w.ID, err)
 		}
-		for _, msg := range src.warnings {
-			fmt.Fprintf(os.Stderr, "warning: %s\n", msg)
-		}
+		sourceWarns = append(sourceWarns, src.warnings...)
 		sources[w.ID] = src
 		query, err := buildMBQL(w, d, src, reg)
 		if err != nil {
@@ -75,6 +74,9 @@ func Emit(d *parser.Dashboard, opts EmitOptions, reg *parser.Registry) (map[stri
 			return nil, err
 		}
 		files[fmt.Sprintf("collections/main/cards/%s_%s.yaml", eid, slug(title))] = b
+	}
+	for _, msg := range uniqueStrings(sourceWarns) {
+		fmt.Fprintf(os.Stderr, "warning: %s\n", msg)
 	}
 
 	// Dashboard
@@ -151,6 +153,9 @@ func buildVizSettings(w parser.Widget, d *parser.Dashboard, reg *parser.Registry
 			if len(one) > 0 {
 				settings[shortName(s.Name)] = one
 			}
+		}
+		if tips := tooltipColumns(w.Series); len(tips) > 0 {
+			vs["graph.tooltip_columns"] = tips
 		}
 		if len(colors) > 0 {
 			vs["graph.colors"] = colors
@@ -290,7 +295,7 @@ func buildDashcards(d *parser.Dashboard, cardIDs map[string]string, sources map[
 }
 
 // buildParameterMappings wires each filter on the widget to a field on the card.
-// Widget parameters only substitute title templates. An MBQL card has no template tags.
+// A function-source argument is a template tag instead. Other widget parameters only substitute title templates.
 func buildParameterMappings(d *parser.Dashboard, w parser.Widget, src cardSource, reg *parser.Registry) ([]map[string]any, []string) {
 	var mappings []map[string]any
 	var warnings []string
@@ -299,6 +304,10 @@ func buildParameterMappings(d *parser.Dashboard, w parser.Widget, src cardSource
 		f := findFilter(d, filterName)
 		if f == nil {
 			warnings = append(warnings, fmt.Sprintf("widget %q: filter %q is not declared, mapping skipped", w.ID, filterName))
+			continue
+		}
+		if arg, ok := src.argumentForFilter(f.Name); ok {
+			mappings = append(mappings, templateMapping(f.Name, w.ID, arg.Name))
 			continue
 		}
 		binding := filterBindingForWidget(*f, w)
@@ -318,8 +327,23 @@ func buildParameterMappings(d *parser.Dashboard, w parser.Widget, src cardSource
 			},
 		})
 	}
+	for _, name := range w.Parameters {
+		arg, ok := src.argumentForParameter(name)
+		if !ok {
+			continue
+		}
+		mappings = append(mappings, templateMapping(name, w.ID, arg.Name))
+	}
 
 	return mappings, warnings
+}
+
+func templateMapping(control, widgetID, argName string) map[string]any {
+	return map[string]any{
+		"parameter_id": stableID("param-" + control),
+		"card_id":      stableID("card-" + widgetID),
+		"target":       []any{"variable", []any{"template-tag", argName}},
+	}
 }
 
 // lossWarnings reports query behaviour the Metabase emitter does not carry.
@@ -335,6 +359,38 @@ func lossWarnings(d *parser.Dashboard) []string {
 	for _, w := range d.Spec.Widgets {
 		for _, a := range w.Actions {
 			out = append(out, fmt.Sprintf("widget %q: action %q is not emitted", w.ID, a.Type))
+		}
+		if w.VisibleWhen != nil && w.VisibleWhen.Parameter != "" {
+			out = append(out, fmt.Sprintf("widget %q is visible when %s equals %v; Metabase shows the card for every value", w.ID, w.VisibleWhen.Parameter, w.VisibleWhen.Equals))
+		}
+	}
+	return out
+}
+
+func uniqueStrings(in []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, msg := range in {
+		if seen[msg] {
+			continue
+		}
+		seen[msg] = true
+		out = append(out, msg)
+	}
+	return out
+}
+
+func tooltipColumns(series []parser.Series) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range series {
+		for _, name := range s.TooltipFields {
+			short := shortName(name)
+			if short == "" || seen[short] {
+				continue
+			}
+			seen[short] = true
+			out = append(out, short)
 		}
 	}
 	return out

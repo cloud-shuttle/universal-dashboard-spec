@@ -43,11 +43,33 @@
   "$defs": {
     "source": {
       "type": "object",
-      "description": "Physical source table or view.",
+      "description": "Physical source table, view, or table function. Set table or function.",
       "properties": {
         "database": { "type": "string" },
         "schema": { "type": "string" },
-        "table": { "type": "string" }
+        "table": { "type": "string" },
+        "function": {
+          "type": "string",
+          "description": "Table function, optionally schema-qualified, such as analytics.orders_for. Arguments are passed in map order."
+        },
+        "arguments": {
+          "type": "object",
+          "description": "Function arguments in call order. Each value names a parameter or a filter.",
+          "additionalProperties": { "$ref": "#/$defs/sourceArgument" }
+        }
+      }
+    },
+    "sourceArgument": {
+      "type": "object",
+      "properties": {
+        "parameter": { "type": "string", "description": "Dashboard parameter whose value is passed." },
+        "filter": { "type": "string", "description": "Dashboard filter whose value is passed." },
+        "default": { "description": "Value used when the control is empty." },
+        "map": {
+          "type": "object",
+          "description": "Control value to the literal the function receives. year: 12 passes 12 when the control is year.",
+          "additionalProperties": true
+        }
       }
     },
     "entity": {
@@ -110,7 +132,17 @@
           "type": "array",
           "description": "Row predicates. On an aggregation they limit the summed rows. On an expression they apply to every measure the expression uses.",
           "items": { "$ref": "#/$defs/predicate" }
-        }
+        },
+        "priorPeriod": { "$ref": "#/$defs/priorPeriod" }
+      }
+    },
+    "priorPeriod": {
+      "type": "object",
+      "required": ["dimension", "offset"],
+      "description": "The same aggregation shifted along a breakout. offset -1 is the previous period of that dimension. The widget must break out by the dimension.",
+      "properties": {
+        "dimension": { "type": "string" },
+        "offset": { "type": "integer" }
       }
     },
     "metric": {

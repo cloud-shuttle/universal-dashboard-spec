@@ -411,4 +411,89 @@ func TestMissingDatabaseWarnsAndFlagFillsJoins(t *testing.T) {
 	if rs.table != "ORDERS" || len(rs.warnings) != 1 || !strings.Contains(rs.warnings[0], "has no source") || !strings.Contains(rs.warnings[0], "ORDERS") {
 		t.Fatalf("sourceless model = %s.%s.%s warnings %#v", rs.db, rs.schema, rs.table, rs.warnings)
 	}
+	collapsed := uniqueStrings([]string{rs.warnings[0], rs.warnings[0]})
+	if len(collapsed) != 1 {
+		t.Fatalf("dedupe = %#v", collapsed)
+	}
+}
+
+func TestFunctionSourcePriorPeriodAndNullRatio(t *testing.T) {
+	reg := parser.NewRegistry()
+	reg.Add(&parser.SemanticModel{
+		Metadata: parser.Metadata{Name: "orders", Title: "Orders"},
+		Spec: parser.SemanticModelSpec{
+			Source: &parser.Source{
+				Database: "Warehouse",
+				Function: "analytics.orders_for",
+				Arguments: parser.Arguments{
+					{Name: "p_region", Filter: "region", Default: "All"},
+					{Name: "p_window", Parameter: "compare", Map: map[string]any{"quarter": 3, "year": 12}},
+				},
+			},
+			Measures: []parser.Measure{
+				{Name: "amount", Aggregation: "sum", Field: "amount"},
+				{Name: "amount_prior", Aggregation: "sum", Field: "amount", PriorPeriod: &parser.PriorPeriod{Dimension: "year", Offset: -1}},
+			},
+			Dimensions: []parser.Dimension{{Name: "year", Field: "order_year", Type: "categorical"}},
+			Metrics:    []parser.Metric{{Name: "growth", Type: "derived", Expression: "amount / amount_prior - 1"}},
+		},
+	})
+	d := &parser.Dashboard{
+		Metadata: parser.Metadata{Name: "sales", Title: "Sales"},
+		Spec: parser.Spec{
+			Parameters: []parser.Parameter{{Name: "compare", Title: "Compare", Type: "string", Default: "year"}},
+			Filters:    []parser.Filter{{Name: "region", Title: "Region"}},
+			Widgets: []parser.Widget{{
+				ID: "growth", Type: "line", Title: "Growth",
+				Measures:   []string{"orders.growth"},
+				Dimensions: []string{"orders.year"},
+				Filters:    []string{"region"},
+				Parameters: []string{"compare"},
+				Series:     []parser.Series{{Name: "growth", TooltipFields: []string{"orders.year"}}},
+				Layout:     parser.Layout{W: 12, H: 6},
+			}},
+		},
+	}
+	files, err := Emit(d, EmitOptions{}, reg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var card, dash string
+	for name, body := range files {
+		if strings.Contains(name, "dashboards") {
+			dash = string(body)
+		} else {
+			card = string(body)
+		}
+	}
+	for _, want := range []string{
+		"analytics.orders_for",
+		"{{p_region}}",
+		"CASE {{p_window}}",
+		"WHEN 'year' THEN 12",
+		"source-query",
+		"template-tags",
+		"offset",
+		"case",
+		"null",
+		"order_year",
+	} {
+		if !strings.Contains(card, want) {
+			t.Fatalf("card missing %q\n%s", want, card)
+		}
+	}
+	if strings.Contains(card, "ORDERS") || strings.Contains(card, "left-join") {
+		t.Fatalf("function source used a table join\n%s", card)
+	}
+	if !strings.Contains(dash, "template-tag") || !strings.Contains(dash, "p_region") || !strings.Contains(dash, "p_window") {
+		t.Fatalf("dashboard mappings\n%s", dash)
+	}
+	if !strings.Contains(card, "default: All") || !strings.Contains(card, "default: year") {
+		t.Fatalf("template tag defaults\n%s", card)
+	}
+	vs := buildVizSettings(d.Spec.Widgets[0], d, reg)
+	tips, _ := vs["graph.tooltip_columns"].([]string)
+	if len(tips) != 1 || tips[0] != "year" {
+		t.Fatalf("tooltips %#v", vs["graph.tooltip_columns"])
+	}
 }

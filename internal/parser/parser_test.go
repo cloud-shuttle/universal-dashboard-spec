@@ -1,8 +1,10 @@
 package parser
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -94,6 +96,46 @@ func TestEmbeddedSchemasMatch(t *testing.T) {
 			t.Fatalf("%s differs from %s", pair[0], pair[1])
 		}
 	}
+}
+
+func TestFunctionArgumentsKeepYAMLOrder(t *testing.T) {
+	path := writeTemp(t, `
+apiVersion: uds/v1
+kind: SemanticModel
+metadata:
+  name: rank
+  title: Rank
+spec:
+  source:
+    database: Warehouse
+    function: analytics.orders_for
+    arguments:
+      p_as_of: { parameter: as_of_month }
+      p_region: { filter: region, default: All }
+      p_window: { parameter: compare, map: { year: 12, quarter: 3 } }
+  dimensions:
+    - { name: rank, type: number, field: rank }
+  measures:
+    - { name: rows, aggregation: count, field: customer }
+`)
+	m, err := LoadSemanticModel(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := m.Spec.Source.Arguments
+	if m.Spec.Source.Function != "analytics.orders_for" || len(args) != 3 {
+		t.Fatalf("source = %+v", m.Spec.Source)
+	}
+	if args[0].Name != "p_as_of" || args[1].Name != "p_region" || args[1].Default != "All" || args[2].Name != "p_window" {
+		t.Fatalf("arguments = %+v", args)
+	}
+	if args[2].Map["year"] != 12 && args[2].Map["year"] != int64(12) && fmtNumber(args[2].Map["year"]) != "12" {
+		t.Fatalf("map = %#v", args[2].Map)
+	}
+}
+
+func fmtNumber(v any) string {
+	return strings.TrimSpace(strings.ReplaceAll(fmt.Sprint(v), "\n", ""))
 }
 
 func TestExamplesLoad(t *testing.T) {
